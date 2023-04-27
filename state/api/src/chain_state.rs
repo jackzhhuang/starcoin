@@ -1,7 +1,7 @@
 // Copyright (c) The Starcoin Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::TABLE_PATH;
+use crate::TABLE_PATH_LIST;
 use anyhow::{ensure, format_err, Result};
 use forkable_jellyfish_merkle::{blob::Blob, proof::SparseMerkleProof, RawKey};
 use serde::de::DeserializeOwned;
@@ -16,7 +16,7 @@ use starcoin_types::{
     account_state::AccountState, state_set::ChainStateSet,
 };
 use starcoin_vm_types::account_config::{
-    genesis_address, table_handle_address, BalanceResource, TokenInfo, G_STC_TOKEN_CODE,
+    genesis_address, BalanceResource, TokenInfo, G_STC_TOKEN_CODE, TABLE_HANDLE_ADDRESS_LIST,
 };
 use starcoin_vm_types::genesis_config::ChainId;
 use starcoin_vm_types::language_storage::ModuleId;
@@ -408,9 +408,17 @@ impl StateWithTableItemProof {
     }
 
     pub fn verify(&self, handle: &TableHandle, key: &[u8]) -> Result<()> {
+        // XXX FIXME YSG
+        let handle_address = TABLE_HANDLE_ADDRESS_LIST
+            .get(0)
+            .expect("get TABLE_HANDLE_ADDRESS_LIST should always succeed");
+        let table_path = TABLE_PATH_LIST
+            .get(0)
+            .expect("get TABLE_PATH_LIST should always succeed");
+        // XXX FIXME YSG
         self.state_proof.0.proof.verify(
             self.state_proof.1,
-            AccessPath::new(table_handle_address(), TABLE_PATH.clone()),
+            AccessPath::new(handle_address.clone(), table_path.clone()),
             self.state_proof.0.state.as_deref(),
         )?;
         self.table_handle_proof.1.verify(
