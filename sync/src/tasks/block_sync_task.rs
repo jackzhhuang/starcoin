@@ -167,7 +167,7 @@ impl TaskState for BlockSyncTask {
                         .fetch_blocks(no_exist_block_ids)
                         .await?
                         .into_iter()
-                        .fold(result_map, |mut result_map, (block, peer_id, _)| {
+                        .fold(result_map, |mut result_map, (block, peer_id, _, _)| {
                             result_map.insert(
                                 block.id(),
                                 SyncBlockData::new(block, None, peer_id, None, 1, None, None),
@@ -191,7 +191,7 @@ impl TaskState for BlockSyncTask {
                     .fetch_blocks(block_ids)
                     .await?
                     .into_iter()
-                    .map(|(block, peer_id, _)| {
+                    .map(|(block, peer_id, _, _)| {
                         SyncBlockData::new(block, None, peer_id, None, 1, None, None)
                     })
                     .collect())

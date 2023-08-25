@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, format_err, Error, Result};
+use starcoin_accumulator::{MerkleAccumulator, Accumulator};
+use starcoin_accumulator::node::AccumulatorStoreType;
 use starcoin_chain::BlockChain;
 use starcoin_chain_api::message::{ChainRequest, ChainResponse};
 use starcoin_chain_api::{
@@ -356,7 +358,7 @@ impl ReadableChainService for ChainReaderServiceInner {
     fn get_blocks(
         &self,
         ids: Vec<HashValue>,
-    ) -> Result<Vec<Option<(Block, Option<Vec<HashValue>>)>>> {
+    ) -> Result<Vec<Option<(Block, Option<Vec<HashValue>>, Option<HashValue>)>>> {
         let blocks = self.storage.get_blocks(ids)?;
         Ok(blocks
             .into_iter()
@@ -371,7 +373,18 @@ impl ReadableChainService for ChainReaderServiceInner {
                         Ok(parents) => parents,
                         Err(_) => panic!("failed to get parents of block {}", block.id()),
                     };
-                    Some((block, Some(parents)))
+                    let transaction_parent = match self.storage.get_block_info(block.id()) {
+                        Ok(block_info) => {
+                            if let Some(block_info) = &block_info {
+                                let block_accumulator = MerkleAccumulator::new_with_info(block_info.block_accumulator_info.clone(), self.storage.get_accumulator_store(AccumulatorStoreType::Block));
+                                block_accumulator.get_leaf(block_info.block_accumulator_info.num_leaves - 2).expect("block should have transction header")
+                            } else {
+                                None
+                            } 
+                        }
+                        Err(_) => todo!(),
+                    };
+                    Some((block, Some(parents), transaction_parent))
                 } else {
                     None
                 }
