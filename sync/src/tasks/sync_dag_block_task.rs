@@ -18,7 +18,6 @@ use super::{block_sync_task::SyncBlockData, BlockLocalStore};
 pub struct SyncDagBlockTask {
     accumulator: Arc<MerkleAccumulator>,
     start_index: u64,
-    batch_size: u64,
     target: AccumulatorInfo,
     fetcher: Arc<VerifiedRpcClient>,
     accumulator_snapshot: Arc<SyncFlexiDagSnapshotStorage>,
@@ -28,7 +27,6 @@ impl SyncDagBlockTask {
     pub fn new(
         accumulator: MerkleAccumulator,
         start_index: u64,
-        batch_size: u64,
         target: AccumulatorInfo,
         fetcher: Arc<VerifiedRpcClient>,
         accumulator_snapshot: Arc<SyncFlexiDagSnapshotStorage>,
@@ -37,7 +35,6 @@ impl SyncDagBlockTask {
         SyncDagBlockTask {
             accumulator: Arc::new(accumulator),
             start_index,
-            batch_size,
             target,
             fetcher,
             accumulator_snapshot: accumulator_snapshot.clone(),
@@ -193,14 +190,13 @@ impl TaskState for SyncDagBlockTask {
     }
 
     fn next(&self) -> Option<Self> {
-        let next_number = self.start_index.saturating_add(self.batch_size);
+        let next_number = self.start_index.saturating_add(1);
         if next_number > self.target.num_leaves {
             return None;
         }
         Some(Self {
             accumulator: self.accumulator.clone(),
             start_index: next_number,
-            batch_size: self.batch_size,
             target: self.target.clone(),
             fetcher: self.fetcher.clone(),
             accumulator_snapshot: self.accumulator_snapshot.clone(),

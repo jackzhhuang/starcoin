@@ -9,6 +9,7 @@ use starcoin_chain::BlockChain;
 use starcoin_consensus::BlockDAG;
 use starcoin_crypto::HashValue;
 use starcoin_executor::VMMetrics;
+use starcoin_logger::prelude::debug;
 use starcoin_network::NetworkServiceRef;
 use starcoin_service_registry::ServiceRef;
 use starcoin_storage::{flexi_dag::SyncFlexiDagSnapshotStorage, storage::CodecKVStore, Store};
@@ -144,7 +145,8 @@ fn sync_accumulator(
     // return Ok(async_std::task::block_on(sync));
     match async_std::task::block_on(sync) {
         std::result::Result::Ok((index, accumulator)) => {
-            println!("sync accumulator success");
+            debug!("sync accumulator success, target accumulator info's leaf count = {}, root hash = {}, begin index = {}", 
+                accumulator.get_info().get_num_leaves(), accumulator.get_info().get_accumulator_root(), index);
             return Ok((index, accumulator));
         }
         Err(error) => {
@@ -238,7 +240,6 @@ where
             SyncDagBlockTask::new(
                 accumulator,
                 start_index.saturating_add(1),
-                10,
                 accumulator_info,
                 fetcher.clone(),
                 accumulator_snapshot.clone(),
