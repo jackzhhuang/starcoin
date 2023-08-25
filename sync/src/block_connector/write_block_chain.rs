@@ -670,10 +670,12 @@ where
                 // TimeWindowResult::AfterTimeWindow => {
                 _ => {
                     // dump the block in the time window pool and put the block into the next time window pool
+                    let block_id = block.header.id();
                     self.dag_block_pool
                         .lock()
                         .unwrap()
                         .push((block, dag_block_parents.clone()));
+                    let _testing = self.dag.lock().unwrap().push_parent_children(block_id, Arc::new(dag_block_parents.clone()));
                     self.main.status().tips_hash = None; // set the tips to None, and in connect_to_main, the block will be added to the tips
                     let mut dag_blocks = self.dag_block_pool.lock().unwrap().clone();
                     self.dag_block_pool.lock().unwrap().clear();
