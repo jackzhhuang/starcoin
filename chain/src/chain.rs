@@ -613,6 +613,11 @@ impl BlockChain {
             .query_by_hash(leaf_hash)?
             .expect("dag accumualator's snapshot should not be None"))
     }
+
+    pub fn update_dag_accumulator(&mut self, head_id: HashValue) -> Result<()> {
+        self.dag_accumulator = self.dag_accumulator.fork(self.storage.get_dag_accumulator_info(head_id).expect("accumulator info should not be None"));
+        Ok(())
+    }
 }
 
 impl ChainReader for BlockChain {

@@ -91,8 +91,14 @@ impl EventHandler<Self, NewHeadBlock> for ChainReaderService {
         let new_head = event.0.block().header();
         if let Err(e) = if self.inner.get_main().can_connect(event.0.as_ref()) {
             let mut next_tips = event.2.clone();
-            self.inner
-                .update_chain_head(event.0.as_ref().clone(), &mut next_tips)
+
+            match self.inner
+                .update_chain_head(event.0.as_ref().clone(), &mut next_tips) {
+                Ok(_) => {
+                    self.inner.update_dag_accumulator(new_head.id())
+                }
+                Err(e) => Err(e),
+            }
         } else {
             self.inner.switch_main(new_head.id())
         } {
@@ -330,6 +336,11 @@ impl ChainReaderServiceInner {
             self.vm_metrics.clone(),
         )?;
         Ok(())
+    }
+
+
+    pub fn update_dag_accumulator(&mut self, head_id: HashValue) -> Result<()> {
+        self.main.update_dag_accumulator(head_id)
     }
 }
 
