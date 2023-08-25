@@ -247,7 +247,7 @@ impl SyncService {
             {
                 if let Some(target_accumulator_info) = op_dag_accumulator_info {
                     let local_dag_accumulator_info = storage.get_dag_accumulator_info(current_block_id)?.expect("current dag accumulator info should exist");
-                    sync_dag_full_task(
+                    let block_chain = sync_dag_full_task(
                         local_dag_accumulator_info,
                         target_accumulator_info,
                         rpc_client.clone(),
@@ -260,8 +260,8 @@ impl SyncService {
                         network.clone(),
                         skip_pow_verify,
                         dag.clone(),
-                    );
-                    Ok(None)
+                    )?;
+                    Ok(block_chain)
                 } else {
                     info!("[sync] Find target({}), total_difficulty:{}, current head({})'s total_difficulty({})", target.target_id.id(), target.block_info.total_difficulty, current_block_id, current_block_info.total_difficulty);
 
