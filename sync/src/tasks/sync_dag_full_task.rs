@@ -313,10 +313,6 @@ pub fn sync_dag_full_task(
         event_handle.clone(),
     )?;
 
-    if local_accumulator_info.accumulator_root == target_accumulator_info.accumulator_root {
-        return Ok(None);
-    }
-
     return match sync_accumulator(
         ancestor,
         target_accumulator_info,
