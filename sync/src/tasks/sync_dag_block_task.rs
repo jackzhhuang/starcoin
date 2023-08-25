@@ -191,7 +191,7 @@ impl TaskState for SyncDagBlockTask {
 
     fn next(&self) -> Option<Self> {
         let next_number = self.start_index.saturating_add(1);
-        if next_number > self.target.num_leaves {
+        if next_number >= self.target.num_leaves {
             return None;
         }
         Some(Self {
