@@ -7,6 +7,7 @@ use crate::tasks::{full_sync_task, sync_dag_full_task, AncestorEvent, SyncFetche
 use crate::verified_rpc_client::{RpcVerifyError, VerifiedRpcClient};
 use anyhow::{format_err, Result};
 use futures::FutureExt;
+use futures::executor::block_on;
 use futures_timer::Delay;
 use network_api::peer_score::PeerScoreMetrics;
 use network_api::{PeerId, PeerProvider, PeerSelector, PeerStrategy, ReputationChange};
@@ -625,6 +626,7 @@ impl EventHandler<Self, NewHeadBlock> for SyncService {
             block.block_info.clone(),
             next_tips,
         )) {
+            self.sync_status.update_dag_accumulator_info(self.storage.get_dag_accumulator_info(block.header().id()).expect("dag accumulator info must exist"));
             ctx.broadcast(SyncStatusChangeEvent(self.sync_status.clone()));
         }
     }
