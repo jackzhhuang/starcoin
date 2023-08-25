@@ -186,7 +186,7 @@ fn sync_dag_block<H, N>(
     skip_pow_verify_when_sync: bool,
     dag: Arc<Mutex<BlockDAG>>,
     vm_metrics: Option<VMMetrics>,
-) -> anyhow::Result<()>
+) -> anyhow::Result<BlockChain>
 where
     H: BlockConnectedEventHandle + Sync + 'static,
     N: PeerProvider + Clone + 'static,
@@ -263,9 +263,9 @@ where
         .generate();
         let (fut, handle) = sync_task.with_handle();
         match fut.await {
-            anyhow::Result::Ok(_) => {
+            anyhow::Result::Ok(block_chain) => {
                 println!("finish to sync dag blocks");
-                return anyhow::Result::Ok(());
+                return anyhow::Result::Ok(block_chain);
             }
             Err(error) => {
                 println!(
@@ -274,13 +274,13 @@ where
                 );
                 return Err(error);
             }
-        }
+        };
     });
 
     match async_std::task::block_on(sync) {
-        std::result::Result::Ok(()) => {
+        std::result::Result::Ok(block_chain) => {
             println!("sync dag blocks success");
-            return Ok(());
+            return Ok(block_chain);
         }
         Err(error) => {
             bail!("sync accumulator error: {}", error.to_string());
@@ -301,11 +301,11 @@ pub fn sync_dag_full_task(
     network: NetworkServiceRef,
     skip_pow_verify_when_sync: bool,
     dag: Arc<Mutex<BlockDAG>>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Option<BlockChain>> {
     let event_handle = Arc::new(TaskEventCounterHandle::new());
 
     let ancestor = find_dag_ancestor_task(
-        local_accumulator_info,
+        local_accumulator_info.clone(),
         target_accumulator_info.clone(),
         fetcher.clone(),
         accumulator_store.clone(),
@@ -313,7 +313,11 @@ pub fn sync_dag_full_task(
         event_handle.clone(),
     )?;
 
-    match sync_accumulator(
+    if local_accumulator_info.accumulator_root == target_accumulator_info.accumulator_root {
+        return Ok(None);
+    }
+
+    return match sync_accumulator(
         ancestor,
         target_accumulator_info,
         fetcher.clone(),
@@ -321,7 +325,7 @@ pub fn sync_dag_full_task(
         accumulator_snapshot.clone(),
     ) {
         anyhow::Result::Ok((start_index, accumulator)) => {
-            return sync_dag_block(
+            Ok(sync_dag_block(
                 start_index,
                 accumulator,
                 fetcher.clone(),
@@ -333,10 +337,10 @@ pub fn sync_dag_full_task(
                 skip_pow_verify_when_sync,
                 dag.clone(),
                 vm_metrics,
-            );
+            ).ok())
         }
         Err(error) => {
             bail!("sync accumulator error: {}", error.to_string());
         }
-    }
+    };
 }
