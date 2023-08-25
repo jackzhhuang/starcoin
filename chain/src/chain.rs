@@ -190,15 +190,9 @@ impl BlockChain {
         self.uncles.len() as u64
     }
 
-    fn calculate_dag_accumulator_key(mut tips: Vec<HashValue>) -> Result<HashValue> {
+    pub fn calculate_dag_accumulator_key(mut tips: Vec<HashValue>) -> Result<HashValue> {
         tips.sort();
-        Ok(HashValue::sha3_256_of(&tips.into_iter().fold(
-            [].to_vec(),
-            |mut collect, hash| {
-                collect.extend(hash.into_iter());
-                collect
-            },
-        )))
+        Ok(HashValue::sha3_256_of(&tips.encode().expect("encoding the sorted relatship set must be successful")))
     }
 
     pub fn current_block_accumulator_info(&self) -> AccumulatorInfo {
