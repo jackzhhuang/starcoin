@@ -5,7 +5,10 @@ use crate::message::{ChainRequest, ChainResponse};
 use crate::TransactionInfoWithProof;
 use anyhow::{bail, Result};
 use starcoin_crypto::HashValue;
-use starcoin_network_rpc_api::dag_protocol::{self, GetDagAccumulatorLeaves, TargetDagAccumulatorLeaf, TargetDagAccumulatorLeafDetail, GetTargetDagAccumulatorLeafDetail};
+use starcoin_network_rpc_api::dag_protocol::{
+    self, GetDagAccumulatorLeaves, GetTargetDagAccumulatorLeafDetail, TargetDagAccumulatorLeaf,
+    TargetDagAccumulatorLeafDetail,
+};
 use starcoin_service_registry::{ActorService, ServiceHandler, ServiceRef};
 use starcoin_types::contract_event::{ContractEvent, ContractEventInfo};
 use starcoin_types::filter::Filter;

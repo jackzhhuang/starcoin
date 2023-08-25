@@ -178,7 +178,8 @@ impl BlockChain {
         dag_accumulator.append(&new_tips)?;
         dag_accumulator.flush()?;
         storage.append_dag_accumulator_leaf(
-            Self::calculate_dag_accumulator_key(new_tips.clone()).expect("failed to calculate the dag key"),
+            Self::calculate_dag_accumulator_key(new_tips.clone())
+                .expect("failed to calculate the dag key"),
             new_tips,
             dag_accumulator.get_info(),
         )?;
@@ -192,7 +193,9 @@ impl BlockChain {
 
     pub fn calculate_dag_accumulator_key(mut tips: Vec<HashValue>) -> Result<HashValue> {
         tips.sort();
-        Ok(HashValue::sha3_256_of(&tips.encode().expect("encoding the sorted relatship set must be successful")))
+        Ok(HashValue::sha3_256_of(&tips.encode().expect(
+            "encoding the sorted relatship set must be successful",
+        )))
     }
 
     pub fn current_block_accumulator_info(&self) -> AccumulatorInfo {
@@ -645,12 +648,12 @@ impl ChainReader for BlockChain {
 
     fn current_tips_hash(&self) -> Option<HashValue> {
         match self.status.status.tips_hash.clone() {
-            Some(mut tips_hash) => {
+            Some(tips_hash) => {
                 assert!(!tips_hash.is_empty());
-                tips_hash.sort_by_key(|key| key.clone());
-                Some(HashValue::sha3_256_of(
-                    &tips_hash.encode().expect("failed to encode tips hash"),
-                ))
+                Some(
+                    Self::calculate_dag_accumulator_key(tips_hash)
+                        .expect("calculate dag key should be successful"),
+                )
             }
             None => None,
         }
@@ -1087,8 +1090,22 @@ impl BlockChain {
 }
 
 impl ChainWriter for BlockChain {
-    fn can_connect(&self, executed_block: &ExecutedBlock) -> bool {
-        executed_block.block.header().parent_hash() == self.status.status.head().id()
+    fn can_connect(
+        &self,
+        executed_block: &ExecutedBlock,
+    ) -> bool {
+        if executed_block.block.header().parent_hash() == self.status.status.head().id() {
+            return true;
+        } else {
+            return Self::calculate_dag_accumulator_key(
+                self.status
+                    .status
+                    .tips_hash.as_ref()
+                    .expect("dag blocks must have tips").clone(),
+            )
+            .expect("failed to calculate the tips hash")
+                == executed_block.block().header().parent_hash();
+        }
     }
 
     fn connect(
@@ -1101,10 +1118,7 @@ impl ChainWriter for BlockChain {
             let mut tips = self.status.status.tips_hash.clone().unwrap();
             tips.sort();
             debug_assert!(
-                block.header().parent_hash()
-                    == HashValue::sha3_256_of(
-                        &tips.encode().expect("hash encode must be sucessful")
-                    )
+                block.header().parent_hash() == Self::calculate_dag_accumulator_key(tips.clone())?
             );
         } else {
             debug_assert!(block.header().parent_hash() == self.status.status.head().id());
@@ -1127,8 +1141,8 @@ impl ChainWriter for BlockChain {
         self.statedb = ChainStateDB::new(self.storage.clone().into_super_arc(), Some(state_root));
         match next_tips {
             Some(tips) => {
-                if !tips.contains(&block.id()) {
-                    tips.push(block.id());
+                if !tips.contains(&block.header().id()) {
+                    tips.push(block.header().id())
                 }
             }
             None => (),

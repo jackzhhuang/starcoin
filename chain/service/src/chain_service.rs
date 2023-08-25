@@ -1,7 +1,7 @@
 // Copyright (c) The Starcoin Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{format_err, Error, Result, bail};
+use anyhow::{bail, format_err, Error, Result};
 use starcoin_chain::BlockChain;
 use starcoin_chain_api::message::{ChainRequest, ChainResponse};
 use starcoin_chain_api::{
@@ -253,10 +253,11 @@ impl ServiceHandler<Self, ChainRequest> for ChainReaderService {
                 start_index,
                 batch_size,
             } => Ok(ChainResponse::TargetDagAccumulatorLeaf(
-                self.inner.get_dag_accumulator_leaves(GetDagAccumulatorLeaves {
-                    accumulator_leaf_index: start_index,
-                    batch_size,
-                })?,
+                self.inner
+                    .get_dag_accumulator_leaves(GetDagAccumulatorLeaves {
+                        accumulator_leaf_index: start_index,
+                        batch_size,
+                    })?,
             )),
             ChainRequest::GetTargetDagAccumulatorLeafDetail {
                 leaf_index,
