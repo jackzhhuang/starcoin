@@ -33,6 +33,7 @@ use starcoin_types::{
     block::{Block, BlockBody, BlockHeaderBuilder, BlockIdAndNumber, BlockInfo},
     U256,
 };
+use starcoin_vm_types::effects::Op;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use stream_task::{
@@ -685,13 +686,13 @@ impl BlockFetcher for MockBlockFetcher {
     fn fetch_blocks(
         &self,
         block_ids: Vec<HashValue>,
-    ) -> BoxFuture<Result<Vec<(Block, Option<PeerId>, Option<Vec<HashValue>>)>>> {
+    ) -> BoxFuture<Result<Vec<(Block, Option<PeerId>, Option<Vec<HashValue>>, Option<HashValue>)>>> {
         let blocks = self.blocks.lock().unwrap();
-        let result: Result<Vec<(Block, Option<PeerId>, Option<Vec<HashValue>>)>> = block_ids
+        let result: Result<Vec<(Block, Option<PeerId>, Option<Vec<HashValue>>, Option<HashValue>)>> = block_ids
             .iter()
             .map(|block_id| {
                 if let Some(block) = blocks.get(block_id).cloned() {
-                    Ok((block, None, None))
+                    Ok((block, None, None, None))
                 } else {
                     Err(format_err!("Can not find block by id: {:?}", block_id))
                 }
