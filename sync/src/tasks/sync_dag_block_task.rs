@@ -101,7 +101,12 @@ impl SyncDagBlockTask {
             .map(|(block, peer_info, parents, transaction_header)| {
                 (
                     block.header().id(),
-                    (block.clone(), peer_info.clone(), parents.clone(), transaction_header.clone()),
+                    (
+                        block.clone(),
+                        peer_info.clone(),
+                        parents.clone(),
+                        transaction_header.clone(),
+                    ),
                 )
             })
             .collect::<HashMap<_, _>>();
@@ -133,7 +138,8 @@ impl SyncDagBlockTask {
                         .expect("the block should be got from peer already")
                         .3
                         .to_owned()
-                        .expect("dag block should have parents"));
+                        .expect("dag block should have parents"),
+                );
             }
         });
         result.sort_by_key(|item| item.block_id);

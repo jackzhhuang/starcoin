@@ -28,11 +28,13 @@ pub async fn create_writeable_block_chain() -> (
     let node_config = NodeConfig::random_for_test();
     let node_config = Arc::new(node_config);
 
-    let (storage, chain_info, _) = StarcoinGenesis::init_storage_for_test(node_config.net())
+    let (storage, chain_info, genesis) = StarcoinGenesis::init_storage_for_test(node_config.net())
         .expect("init storage by genesis fail.");
     let registry = RegistryService::launch();
     let bus = registry.service_ref::<BusService>().await.unwrap();
     let txpool_service = MockTxPoolService::new();
+
+    genesis.save(node_config.data_dir()).unwrap();
 
     let (chain_info, genesis) = StarcoinGenesis::init_and_check_storage(
         node_config.net(),
@@ -83,9 +85,9 @@ pub fn gen_blocks(
                 writeable_block_chain_service,
                 time_service,
             );
-            writeable_block_chain_service
-                .try_connect(block, None)
-                .unwrap();
+            let e = writeable_block_chain_service
+                .try_connect(block, None);
+            println!("try_connect result: {:?}", e)
         }
     }
 }
@@ -106,7 +108,7 @@ pub fn new_block(
         .unwrap();
     block_chain
         .consensus()
-        .create_block(block_template, time_service)
+        .create_single_chain_block(block_template, time_service)
         .unwrap()
 }
 
@@ -127,6 +129,7 @@ async fn test_block_chain_apply() {
             .number(),
         times
     );
+    println!("finish test_block_chain_apply");
 }
 
 fn gen_fork_block_chain(
@@ -156,7 +159,7 @@ fn gen_fork_block_chain(
                 .unwrap();
             let block = block_chain
                 .consensus()
-                .create_block(block_template, net.time_service().as_ref())
+                .create_single_chain_block(block_template, net.time_service().as_ref())
                 .unwrap();
             parent_id = block.id();
 

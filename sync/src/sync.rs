@@ -6,8 +6,8 @@ use crate::sync_metrics::SyncMetrics;
 use crate::tasks::{full_sync_task, sync_dag_full_task, AncestorEvent, SyncFetcher};
 use crate::verified_rpc_client::{RpcVerifyError, VerifiedRpcClient};
 use anyhow::{format_err, Result};
-use futures::FutureExt;
 use futures::executor::block_on;
+use futures::FutureExt;
 use futures_timer::Delay;
 use network_api::peer_score::PeerScoreMetrics;
 use network_api::{PeerId, PeerProvider, PeerSelector, PeerStrategy, ReputationChange};
@@ -246,7 +246,9 @@ impl SyncService {
                 rpc_client.get_best_target(current_block_info.get_total_difficulty())?
             {
                 if let Some(target_accumulator_info) = op_dag_accumulator_info {
-                    let local_dag_accumulator_info = storage.get_dag_accumulator_info(current_block_id)?.expect("current dag accumulator info should exist");
+                    let local_dag_accumulator_info = storage
+                        .get_dag_accumulator_info(current_block_id)?
+                        .expect("current dag accumulator info should exist");
                     let block_chain = sync_dag_full_task(
                         local_dag_accumulator_info,
                         target_accumulator_info,
@@ -626,7 +628,11 @@ impl EventHandler<Self, NewHeadBlock> for SyncService {
             block.block_info.clone(),
             next_tips,
         )) {
-            self.sync_status.update_dag_accumulator_info(self.storage.get_dag_accumulator_info(block.header().id()).expect("dag accumulator info must exist"));
+            self.sync_status.update_dag_accumulator_info(
+                self.storage
+                    .get_dag_accumulator_info(block.header().id())
+                    .expect("dag accumulator info must exist"),
+            );
             ctx.broadcast(SyncStatusChangeEvent(self.sync_status.clone()));
         }
     }

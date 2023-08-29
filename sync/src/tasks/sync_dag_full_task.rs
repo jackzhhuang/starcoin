@@ -169,7 +169,8 @@ fn get_start_block_id(
         .query_by_hash(last_block_id)?
         .expect("tips should not be None");
     snapshot.child_hashes.sort();
-    Ok(snapshot.child_hashes
+    Ok(snapshot
+        .child_hashes
         .iter()
         .last()
         .expect("last block id should not be None")
@@ -321,21 +322,20 @@ pub fn sync_dag_full_task(
         accumulator_store.clone(),
         accumulator_snapshot.clone(),
     ) {
-        anyhow::Result::Ok((start_index, accumulator)) => {
-            Ok(sync_dag_block(
-                start_index,
-                accumulator,
-                fetcher.clone(),
-                accumulator_snapshot.clone(),
-                local_store.clone(),
-                time_service.clone(),
-                connector_service.clone(),
-                network,
-                skip_pow_verify_when_sync,
-                dag.clone(),
-                vm_metrics,
-            ).ok())
-        }
+        anyhow::Result::Ok((start_index, accumulator)) => Ok(sync_dag_block(
+            start_index,
+            accumulator,
+            fetcher.clone(),
+            accumulator_snapshot.clone(),
+            local_store.clone(),
+            time_service.clone(),
+            connector_service.clone(),
+            network,
+            skip_pow_verify_when_sync,
+            dag.clone(),
+            vm_metrics,
+        )
+        .ok()),
         Err(error) => {
             bail!("sync accumulator error: {}", error.to_string());
         }

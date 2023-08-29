@@ -16,3 +16,9 @@ starcoin-service-registry = { workspace = true }
 starcoin-consensus = { workspace = true }
 starcoin-types = { workspace = true }
 starcoin-crypto = { workspace = true }
+async-std = { workspace = true }
+starcoin-chain-api = { workspace = true }
+actix = "0.13"
+starcoin-account = { workspace = true }
+starcoin-account-api = { workspace = true }
+futures-core = "0.3.4"

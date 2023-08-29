@@ -54,7 +54,7 @@ pub enum ConnectOk {
     ExeConnectBranch(ExecutedBlock),
     //Block has executed, just connect.
     Connect(ExecutedBlock),
-    
+
     //Block has executed, just connect.
     DagConnected,
     // the retry block
@@ -327,7 +327,10 @@ where
             retracted_blocks,
         )?;
 
-        let next_tips = self.storage.get_tips_by_block_id(executed_block.block.header().id()).ok();
+        let next_tips = self
+            .storage
+            .get_tips_by_block_id(executed_block.block.header().id())
+            .ok();
         self.broadcast_new_head(executed_block, dag_block_parents, next_tips);
 
         Ok(())
@@ -530,13 +533,7 @@ where
                     "Block {} main has been processed, trigger head selection",
                     block_id,
                 );
-                self.do_new_head(
-                    executed_block.clone(),
-                    1,
-                    vec![block],
-                    0,
-                    vec![],
-                )?;
+                self.do_new_head(executed_block.clone(), 1, vec![block], 0, vec![])?;
                 Ok(ConnectOk::Connect(executed_block))
             }
             (None, Some(mut branch)) => {
@@ -621,13 +618,7 @@ where
     ) -> Result<ConnectOk> {
         let executed_block = self.main.apply(block, dag_block_next_parent, next_tips)?;
         let enacted_blocks = vec![executed_block.block().clone()];
-        self.do_new_head(
-            executed_block.clone(),
-            1,
-            enacted_blocks,
-            0,
-            vec![],
-        )?;
+        self.do_new_head(executed_block.clone(), 1, enacted_blocks, 0, vec![])?;
         return Ok(ConnectOk::ExeConnectMain(executed_block));
     }
 
@@ -675,7 +666,11 @@ where
                         .lock()
                         .unwrap()
                         .push((block, dag_block_parents.clone()));
-                    let _testing = self.dag.lock().unwrap().push_parent_children(block_id, Arc::new(dag_block_parents.clone()));
+                    let _testing = self
+                        .dag
+                        .lock()
+                        .unwrap()
+                        .push_parent_children(block_id, Arc::new(dag_block_parents.clone()));
                     self.main.status().tips_hash = None; // set the tips to None, and in connect_to_main, the block will be added to the tips
                     let mut dag_blocks = self.dag_block_pool.lock().unwrap().clone();
                     self.dag_block_pool.lock().unwrap().clear();
@@ -711,7 +706,7 @@ where
                                 ),
                             }
                         });
-                    
+
                     match next_tips {
                         Some(new_tips) => {
                             if new_tips.is_empty() {
@@ -719,12 +714,18 @@ where
                             }
 
                             // 1, write to disc
-                            self.main.append_dag_accumulator_leaf(new_tips.clone()).expect("failed to append new tips to dag accumulator");
+                            self.main
+                                .append_dag_accumulator_leaf(new_tips.clone())
+                                .expect("failed to append new tips to dag accumulator");
 
                             // 2, broadcast the blocks sorted by their id
                             executed_blocks.into_iter().for_each(|exe_block| {
                                 if let Some(block) = exe_block {
-                                    self.broadcast_new_head(block.clone(), Some(dag_block_parents.clone()), Some(new_tips.clone()));
+                                    self.broadcast_new_head(
+                                        block.clone(),
+                                        Some(dag_block_parents.clone()),
+                                        Some(new_tips.clone()),
+                                    );
                                 }
                             });
                         }
@@ -739,7 +740,9 @@ where
         } else {
             // normal block, just connect to main
             let mut next_tips = Some(vec![]);
-            let executed_block = self.connect_to_main(block, None, None, &mut next_tips)?.clone();
+            let executed_block = self
+                .connect_to_main(block, None, None, &mut next_tips)?
+                .clone();
             if let Some(block) = executed_block.block() {
                 self.broadcast_new_head(block.clone(), None, None);
             }
