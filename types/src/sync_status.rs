@@ -45,11 +45,11 @@ pub struct SyncStatus {
 pub const NEARLY_SYNCED_BLOCKS: u64 = 24;
 
 impl SyncStatus {
-    pub fn new(chain_status: ChainStatus) -> Self {
+    pub fn new(chain_status: ChainStatus, dag_accumulator_info: Option<AccumulatorInfo>) -> Self {
         Self {
             chain_status,
             state: SyncState::Prepare,
-            dag_accumulator_info: None,
+            dag_accumulator_info,
         }
     }
 
