@@ -586,12 +586,18 @@ impl BlockChain {
         reverse: bool,
         batch_size: u64,
     ) -> Result<Vec<HashValue>> {
-        self.dag_accumulator.as_ref().ok_or_else(|| anyhow!("dag accumulator is None"))?
+        self.dag_accumulator
+            .as_ref()
+            .ok_or_else(|| anyhow!("dag accumulator is None"))?
             .get_leaves(start_index, reverse, batch_size)
     }
 
     pub fn get_dag_current_leaf_number(&self) -> Result<u64> {
-        Ok(self.dag_accumulator.as_ref().ok_or_else(|| anyhow!("dag accumulator is None"))?.num_leaves())
+        Ok(self
+            .dag_accumulator
+            .as_ref()
+            .ok_or_else(|| anyhow!("dag accumulator is None"))?
+            .num_leaves())
     }
 
     pub fn get_dag_accumulator_snapshot(&self, key: HashValue) -> Result<SyncFlexiDagSnapshot> {
@@ -618,11 +624,16 @@ impl BlockChain {
     }
 
     pub fn update_dag_accumulator(&mut self, head_id: HashValue) -> Result<()> {
-        self.dag_accumulator = Some(self.dag_accumulator.as_ref().ok_or_else(|| anyhow!("dag accumulator is None"))?.fork(
-            self.storage
-                .get_dag_accumulator_info(head_id)
-                .expect("accumulator info should not be None"),
-        ));
+        self.dag_accumulator = Some(
+            self.dag_accumulator
+                .as_ref()
+                .ok_or_else(|| anyhow!("dag accumulator is None"))?
+                .fork(
+                    self.storage
+                        .get_dag_accumulator_info(head_id)
+                        .expect("accumulator info should not be None"),
+                ),
+        );
         Ok(())
     }
 }
@@ -1193,11 +1204,20 @@ impl ChainWriter for BlockChain {
     }
 
     fn get_current_dag_accumulator_info(&self) -> Result<AccumulatorInfo> {
-        Ok(self.dag_accumulator.as_ref().ok_or_else(||anyhow!("dag accumualator is None"))?.get_info())
+        Ok(self
+            .dag_accumulator
+            .as_ref()
+            .ok_or_else(|| anyhow!("dag accumualator is None"))?
+            .get_info())
     }
 
     fn fork_dag_accumulator(&mut self, accumulator_info: AccumulatorInfo) -> Result<()> {
-        self.dag_accumulator = Some(self.dag_accumulator.as_ref().ok_or_else(|| anyhow!("dag accumulator is None"))?.fork(Some(accumulator_info)));
+        self.dag_accumulator = Some(
+            self.dag_accumulator
+                .as_ref()
+                .ok_or_else(|| anyhow!("dag accumulator is None"))?
+                .fork(Some(accumulator_info)),
+        );
         Ok(())
     }
 
@@ -1206,7 +1226,11 @@ impl ChainWriter for BlockChain {
         tips: Vec<HashValue>,
     ) -> Result<(HashValue, AccumulatorInfo)> {
         let key = Self::calculate_dag_accumulator_key(tips.clone())?;
-        let dag_accumulator = self.dag_accumulator.as_ref().ok_or_else(|| anyhow!("dag accumulator is None"))?.fork(None);
+        let dag_accumulator = self
+            .dag_accumulator
+            .as_ref()
+            .ok_or_else(|| anyhow!("dag accumulator is None"))?
+            .fork(None);
         dag_accumulator.append(&[key])?;
         dag_accumulator.flush()?;
         self.storage

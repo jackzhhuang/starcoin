@@ -4,7 +4,7 @@
 use crate::cli_state::CliState;
 use crate::view::{ExecuteResultView, TransactionOptions};
 use crate::StarcoinOpt;
-use anyhow::{ensure, Result};
+use anyhow::{ensure, Result, anyhow};
 use clap::Parser;
 use scmd::{CommandAction, ExecContext};
 use starcoin_transaction_builder::build_empty_script;
@@ -36,7 +36,11 @@ impl CommandAction for GenBlockCommand {
             dry_run: false,
             ..Default::default()
         };
-        ctx.state()
-            .build_and_execute_transaction(txn_opts, TransactionPayload::ScriptFunction(empty))
+        let mut result = std::result::Result::Err(anyhow!("the transaction is not executed yet!"));
+        for _i in 1..=12 {
+            result = ctx.state()
+                .build_and_execute_transaction(txn_opts.clone(), TransactionPayload::ScriptFunction(empty.clone()));
+        }
+        return result;
     }
 }
