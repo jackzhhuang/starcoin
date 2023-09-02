@@ -404,13 +404,14 @@ where
 
         if let Some(parents) = dag_parents.clone() {
             if let Some(dag) = &self.dag {
-                let color = dag
-                    .lock()
-                    .unwrap()
-                    .commit_header(&Header::new(block.header().clone(), parents.clone()))?;
-                if let ColoringOutput::Red = color {
-                    panic!("the red block should not be applied or connected!");
-                }
+                // let color = dag
+                //     .lock()
+                //     .unwrap()
+                //     .commit_header(&Header::new(block.header().clone(), parents.clone()))?;
+                // if let ColoringOutput::Red = color {
+                //     panic!("the red block should not be applied or connected!");
+                // }
+                dag.lock().unwrap().push_parent_children(block_id, Arc::new(parents))?;
             } else {
                 panic!("in dag sync, the dag should not be None")
             }
