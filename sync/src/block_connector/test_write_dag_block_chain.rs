@@ -50,7 +50,6 @@ pub fn gen_dag_blocks(
 
     let result = writeable_block_chain_service
         .execute_dag_block_pool();
-    println!("jacktest***************execute_dag_block_pool result: {:?}", result);
     let result = result.unwrap();
     match result {
         super::write_block_chain::ConnectOk::Duplicate(block)

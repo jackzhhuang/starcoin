@@ -515,7 +515,6 @@ where
         match (block_info, fork) {
             //block has been processed in some branch, so just trigger a head selection.
             (Some(block_info), Some(branch)) => {
-                        println!("jacktest***************3");
                 // both are different, select one
                 debug!(
                     "Block {} has been processed, trigger head selection, total_difficulty: {}",
@@ -528,7 +527,6 @@ where
             }
             //block has been processed, and its parent is main chain, so just connect it to main chain.
             (Some(block_info), None) => {
-                        println!("jacktest***************4");
                 // both are identical
                 let block_id: HashValue = block_info.block_id().clone();
                 let executed_block = self.main.connect(
@@ -547,14 +545,10 @@ where
                 Ok(ConnectOk::Connect(executed_block))
             }
             (None, Some(mut branch)) => {
-                        println!("jacktest***************5");
                 // the block is not in the block, but the parent is
                 let result = branch.apply(block, dag_block_next_parent, next_tips);
-                        println!("jacktest***************8{:?}", result);
                 let executed_block = result?;
-                        println!("jacktest***************6");
                 self.select_head(branch, dag_block_parents)?;
-                        println!("jacktest***************7");
                 Ok(ConnectOk::ExeConnectBranch(executed_block))
             }
             (None, None) => Err(ConnectBlockError::FutureBlock(Box::new(block)).into()),
@@ -600,7 +594,6 @@ where
                         == block.header().parent_hash()
                         && !self.block_exist(block_id)?
                     {
-                        println!("jacktest***************2");
                         return self.apply_and_select_head(
                             block,
                             Some(parents),
@@ -608,7 +601,6 @@ where
                             next_tips,
                         );
                     }
-                    println!("jacktest***************1");
                     self.switch_branch(block, Some(parents), dag_block_next_parent, next_tips)
                 }
                 ColoringOutput::Red => {
