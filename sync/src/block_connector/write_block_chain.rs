@@ -523,6 +523,9 @@ where
                 );
                 let exe_block = branch.head_block();
                 self.select_head(branch, dag_block_parents)?;
+                if let Some(new_tips) = next_tips {
+                    new_tips.push(block_info.block_id().clone());
+                }
                 Ok(ConnectOk::Duplicate(exe_block))
             }
             //block has been processed, and its parent is main chain, so just connect it to main chain.
