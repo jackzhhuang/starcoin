@@ -249,6 +249,7 @@ where
             )?;
         } else {
             //send new branch event
+            self.update_startup_info(executed_block.block().header())?;
             self.broadcast_new_branch(executed_block, dag_block_parents);
         }
         Ok(())
