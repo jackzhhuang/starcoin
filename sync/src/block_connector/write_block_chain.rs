@@ -232,12 +232,17 @@ where
         );
 
         if branch_total_difficulty > main_total_difficulty {
-            let (enacted_count, enacted_blocks, retracted_count, retracted_blocks) =
+            let (enacted_count, enacted_blocks, retracted_count, retracted_blocks) = if dag_block_parents.is_some() {
+                // for dag
+                self.find_ancestors_from_dag_accumulator(&new_branch)?
+            } else {
+                // for single chain
                 if !parent_is_main_head {
                     self.find_ancestors_from_accumulator(&new_branch)?
                 } else {
                     (1, vec![executed_block.block.clone()], 0, vec![])
-                };
+                }
+            };
             self.main = new_branch;
 
             self.do_new_head(
@@ -249,7 +254,6 @@ where
             )?;
         } else {
             //send new branch event
-            self.update_startup_info(executed_block.block().header())?;
             self.broadcast_new_branch(executed_block, dag_block_parents);
         }
         Ok(())
@@ -394,6 +398,47 @@ where
         if let Err(e) = self.txpool.chain_new_block(enacted, retracted) {
             error!("rollback err : {:?}", e);
         }
+    }
+
+
+    fn find_ancestors_from_dag_accumulator(&self, new_branch: &BlockChain) -> Result<(u64, Vec<Block>, u64, Vec<Block>)> {
+        let mut min_leaf_index = std::cmp::min(self.main.get_dag_current_leaf_number()?, new_branch.get_dag_current_leaf_number()?);
+
+        let mut retracted = vec![];
+        let mut enacted = vec![];
+
+        loop {
+            if min_leaf_index == 0 {
+                break;
+            }
+            let main_snapshot = self.main.get_dag_accumulator_snapshot_by_index(min_leaf_index)?;
+            let new_branch_snapshot = new_branch.get_dag_accumulator_snapshot_by_index(min_leaf_index)?;
+
+            if main_snapshot.accumulator_info.get_accumulator_root() == new_branch_snapshot.accumulator_info.get_accumulator_root() {
+                break;
+            }
+
+            retracted.extend(main_snapshot.child_hashes.iter().try_fold(Vec::<Block>::new(), |mut rollback_blocks, child| {
+                let block = self
+                .storage
+                .get_block(child.clone())?
+                .ok_or_else(|| format_err!("Cannot find block {:?}.", child))?;
+                rollback_blocks.push(block);
+                return Ok(rollback_blocks);
+            })?.into_iter());
+
+            enacted.extend(new_branch_snapshot.child_hashes.iter().try_fold(Vec::<Block>::new(), |mut rollback_blocks, child| {
+                let block = self
+                .storage
+                .get_block(child.clone())?
+                .ok_or_else(|| format_err!("Cannot find block {:?}.", child))?;
+                rollback_blocks.push(block);
+                return Ok(rollback_blocks);
+            })?.into_iter());
+
+            min_leaf_index = min_leaf_index.saturating_sub(1);
+        }
+        Ok((enacted.len() as u64, enacted, retracted.len() as u64, retracted))
     }
 
     fn find_ancestors_from_accumulator(
