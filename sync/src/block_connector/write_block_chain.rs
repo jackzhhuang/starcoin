@@ -402,12 +402,14 @@ where
 
 
     fn find_ancestors_from_dag_accumulator(&self, new_branch: &BlockChain) -> Result<(u64, Vec<Block>, u64, Vec<Block>)> {
+        info!("jacktest******** enter find_ancestors_from_dag_accumulator");
         let mut min_leaf_index = std::cmp::min(self.main.get_dag_current_leaf_number()?, new_branch.get_dag_current_leaf_number()?);
 
         let mut retracted = vec![];
         let mut enacted = vec![];
 
         loop {
+            info!("jacktest******** enter find_ancestors_from_dag_accumulator, index = {}", min_leaf_index);
             if min_leaf_index == 0 {
                 break;
             }
@@ -421,18 +423,24 @@ where
             retracted.extend(main_snapshot.child_hashes.iter().try_fold(Vec::<Block>::new(), |mut rollback_blocks, child| {
                 let block = self
                 .storage
-                .get_block(child.clone())?
-                .ok_or_else(|| format_err!("Cannot find block {:?}.", child))?;
-                rollback_blocks.push(block);
+                .get_block(child.clone());
+                if let anyhow::Result::Ok(Some(block)) = block {
+                    rollback_blocks.push(block);
+                } else {
+                    warn!("the block{} dose not exist in main branch, ignore", child.clone());
+                }
                 return Ok(rollback_blocks);
             })?.into_iter());
 
             enacted.extend(new_branch_snapshot.child_hashes.iter().try_fold(Vec::<Block>::new(), |mut rollback_blocks, child| {
                 let block = self
                 .storage
-                .get_block(child.clone())?
-                .ok_or_else(|| format_err!("Cannot find block {:?}.", child))?;
-                rollback_blocks.push(block);
+                .get_block(child.clone());
+                if let anyhow::Result::Ok(Some(block)) = block {
+                    rollback_blocks.push(block);
+                } else {
+                    warn!("the block{} dose not exist in new branch, ignore", child.clone());
+                }
                 return Ok(rollback_blocks);
             })?.into_iter());
 
