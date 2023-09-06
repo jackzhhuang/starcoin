@@ -231,7 +231,7 @@ where
             dag_block_parents.clone(),
         );
 
-        if branch_total_difficulty > main_total_difficulty {
+        if branch_total_difficulty >= main_total_difficulty {
             let (enacted_count, enacted_blocks, retracted_count, retracted_blocks) = if dag_block_parents.is_some() {
                 // for dag
                 self.find_ancestors_from_dag_accumulator(&new_branch)?
@@ -403,7 +403,7 @@ where
 
     fn find_ancestors_from_dag_accumulator(&self, new_branch: &BlockChain) -> Result<(u64, Vec<Block>, u64, Vec<Block>)> {
         info!("jacktest******** enter find_ancestors_from_dag_accumulator");
-        let mut min_leaf_index = std::cmp::min(self.main.get_dag_current_leaf_number()?, new_branch.get_dag_current_leaf_number()?);
+        let mut min_leaf_index = std::cmp::min(self.main.get_dag_current_leaf_number()?, new_branch.get_dag_current_leaf_number()?) - 1;
 
         let mut retracted = vec![];
         let mut enacted = vec![];
