@@ -420,7 +420,8 @@ where
                 break;
             }
 
-            retracted.extend(main_snapshot.child_hashes.iter().try_fold(Vec::<Block>::new(), |mut rollback_blocks, child| {
+            let mut temp_retracted = vec![];
+            temp_retracted.extend(main_snapshot.child_hashes.iter().try_fold(Vec::<Block>::new(), |mut rollback_blocks, child| {
                 let block = self
                 .storage
                 .get_block(child.clone());
@@ -431,8 +432,11 @@ where
                 }
                 return Ok(rollback_blocks);
             })?.into_iter());
+            temp_retracted.sort_by(|a, b| b.header().id().cmp(&a.header().id()));
+            retracted.extend(temp_retracted.into_iter());
 
-            enacted.extend(new_branch_snapshot.child_hashes.iter().try_fold(Vec::<Block>::new(), |mut rollback_blocks, child| {
+            let mut temp_enacted = vec![];
+            temp_enacted.extend(new_branch_snapshot.child_hashes.iter().try_fold(Vec::<Block>::new(), |mut rollback_blocks, child| {
                 let block = self
                 .storage
                 .get_block(child.clone());
@@ -443,9 +447,13 @@ where
                 }
                 return Ok(rollback_blocks);
             })?.into_iter());
+            temp_enacted.sort_by(|a, b| b.header().id().cmp(&a.header().id()));
+            enacted.extend(temp_enacted.into_iter());
 
             min_leaf_index = min_leaf_index.saturating_sub(1);
         }
+        enacted.reverse();
+        retracted.reverse();
         Ok((enacted.len() as u64, enacted, retracted.len() as u64, retracted))
     }
 
