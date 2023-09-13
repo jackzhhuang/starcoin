@@ -13,7 +13,7 @@ use network_api::peer_score::PeerScoreMetrics;
 use network_api::{PeerId, PeerProvider, PeerSelector, PeerStrategy, ReputationChange};
 use starcoin_accumulator::node::AccumulatorStoreType;
 use starcoin_chain::BlockChain;
-use starcoin_chain_api::ChainReader;
+use starcoin_chain_api::{ChainReader, ChainWriter};
 use starcoin_config::NodeConfig;
 use starcoin_consensus::BlockDAG;
 use starcoin_executor::VMMetrics;
@@ -163,6 +163,7 @@ impl SyncService {
         }
 
         let network = ctx.get_shared::<NetworkServiceRef>()?;
+        let block_chain_service = ctx.service_ref::<BlockConnectorService>()?.clone();
         let storage = self.storage.clone();
         let self_ref = ctx.self_ref();
         let connector_service = ctx.service_ref::<BlockConnectorService>()?.clone();
@@ -182,6 +183,7 @@ impl SyncService {
 
         let dag = ctx.get_shared::<Arc<Mutex<BlockDAG>>>()?;
 
+        let test_storage = storage.clone();
         let fut = async move {
             let peer_select_strategy =
                 peer_strategy.unwrap_or_else(|| config.sync.peer_select_strategy());
@@ -240,6 +242,7 @@ impl SyncService {
             let startup_info = storage
                 .get_startup_info()?
                 .ok_or_else(|| format_err!("Startup info should exist."))?;
+            info!("jacktest********** startup info read: {:?}", startup_info);
             let current_block_id = startup_info.main;
             let current_block_info =
                 storage.get_block_info(current_block_id)?.ok_or_else(|| {
@@ -272,6 +275,7 @@ impl SyncService {
                         network.clone(),
                         skip_pow_verify,
                         dag.clone(),
+                        block_chain_service.clone(),
                     )?;
                     self_ref.notify(SyncBeginEvent {
                         target,
@@ -297,6 +301,7 @@ impl SyncService {
                         self_ref.clone(),
                         network.clone(),
                         config.sync.max_retry_times(),
+                        block_chain_service.clone(),
                         sync_metrics.clone(),
                         vm_metrics.clone(),
                     )?;
@@ -333,11 +338,25 @@ impl SyncService {
             |result: Result<Option<BlockChain>, anyhow::Error>| async move {
                 let cancel = match result {
                     Ok(Some(chain)) => {
-                        info!("[sync] Sync to latest block: {:?}", chain.current_header());
+                        info!("[sync] Sync to latest block: {:?}", chain.status());
+                        info!("[sync] Sync to latest accumulator info: {:?}", chain.get_current_dag_accumulator_info());
+
+                        let startup_info = test_storage
+                        .get_startup_info().unwrap()
+                        .ok_or_else(|| format_err!("Startup info should exist.")).unwrap();
+                        info!("jacktest********** after sync, startup info read: {:?}", startup_info);
+                        let current_block_id = startup_info.main;
+
+                        let local_dag_accumulator_info = test_storage
+                        .get_dag_accumulator_info(current_block_id).unwrap()
+                        .expect("current dag accumulator info should exist");
+
+                        info!("jacktest********** after sync, local_dag_accumulator_info: {:?}", local_dag_accumulator_info);
+
                         if let Some(sync_task_total) = sync_task_total.as_ref() {
                             sync_task_total.with_label_values(&["done"]).inc();
                         }
-                        false
+                        true // temporarily set to true
                     }
                     Ok(None) => {
                         debug!("[sync] Check sync task return none, do not need sync.");
@@ -666,6 +685,8 @@ impl ServiceHandler<Self, SyncStatusRequest> for SyncService {
         self.sync_status.clone()
     }
 }
+
+
 
 impl ServiceHandler<Self, PeerScoreRequest> for SyncService {
     fn handle(

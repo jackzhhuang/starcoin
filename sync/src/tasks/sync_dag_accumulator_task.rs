@@ -56,6 +56,7 @@ impl TaskState for SyncDagAccumulatorTask {
                     bail!("return None when sync accumulator for dag");
                 }
             };
+            info!("jacktest************* req: leaf index: {}, batch size: {}, target index: {}, return: {:?}", self.leaf_index, self.batch_size, self.target_index, target_details);
             Ok(target_details)
         }
         .boxed()
@@ -115,7 +116,15 @@ impl TaskResultCollector<TargetDagAccumulatorLeafDetail> for SyncDagAccumulatorC
         let accumulator_leaf = BlockChain::calculate_dag_accumulator_key(item.tips.clone())?;
         self.accumulator.append(&[accumulator_leaf])?;
         let accumulator_info = self.accumulator.get_info();
+        info!(
+            "jacktest*********** item: {:?}, local accumulator info: {:?}",
+            item, accumulator_info);
         if accumulator_info.accumulator_root != item.accumulator_root {
+            info!(
+                "jacktest****************** sync occurs error for the accumulator root differs from other!, local {}, peer {}",
+                accumulator_info.accumulator_root,
+                item.accumulator_root
+            );
             bail!(
                 "sync occurs error for the accumulator root differs from other!, local {}, peer {}",
                 accumulator_info.accumulator_root,
@@ -128,10 +137,20 @@ impl TaskResultCollector<TargetDagAccumulatorLeafDetail> for SyncDagAccumulatorC
         self.accumulator_snapshot.put(
             accumulator_leaf,
             SyncFlexiDagSnapshot {
-                child_hashes: item.tips,
-                accumulator_info,
+                child_hashes: item.tips.clone(),
+                accumulator_info: accumulator_info.clone(),
             },
         )?;
+
+        item.tips.iter().try_fold((), |_, block_id| {
+            self.accumulator_snapshot.put(
+                block_id.clone(),
+                SyncFlexiDagSnapshot {
+                    child_hashes: item.tips.clone(),
+                    accumulator_info: accumulator_info.clone(),
+                },
+            )
+        })?;
 
         if num_leaves == self.target.num_leaves {
             Ok(CollectorState::Enough)
