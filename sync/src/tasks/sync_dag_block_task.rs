@@ -4,6 +4,7 @@ use futures::{future::BoxFuture, FutureExt};
 use starcoin_accumulator::{accumulator_info::AccumulatorInfo, Accumulator, MerkleAccumulator};
 use starcoin_chain::BlockChain;
 use starcoin_chain_api::{ChainWriter, ExecutedBlock};
+use starcoin_logger::prelude::info;
 use starcoin_network_rpc_api::dag_protocol::{GetSyncDagBlockInfo, SyncDagBlockInfo};
 use starcoin_storage::{
     block_info, flexi_dag::SyncFlexiDagSnapshotStorage, storage::CodecKVStore, Store,
@@ -86,6 +87,7 @@ impl SyncDagBlockTask {
             .await?
             .iter()
             .map(|(block, peer_info, parents, transaction_header)| {
+                info!("jacktest********** fetch block number: {}, id: {}", block.header().number(), block.id());
                 (
                     block.header().id(),
                     (

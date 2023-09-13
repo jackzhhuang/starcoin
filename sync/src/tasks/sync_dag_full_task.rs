@@ -8,10 +8,11 @@ use starcoin_accumulator::{
     accumulator_info::AccumulatorInfo, Accumulator, AccumulatorTreeStore, MerkleAccumulator,
 };
 use starcoin_chain::BlockChain;
+use starcoin_chain_api::{ChainWriter, ChainReader};
 use starcoin_consensus::BlockDAG;
 use starcoin_crypto::HashValue;
 use starcoin_executor::VMMetrics;
-use starcoin_logger::prelude::debug;
+use starcoin_logger::prelude::{debug, info};
 use starcoin_network::NetworkServiceRef;
 use starcoin_service_registry::ServiceRef;
 use starcoin_storage::{flexi_dag::SyncFlexiDagSnapshotStorage, storage::CodecKVStore, Store};
@@ -177,6 +178,7 @@ async fn sync_dag_block<H, N>(
     network: N,
     skip_pow_verify_when_sync: bool,
     dag: Arc<Mutex<BlockDAG>>,
+    block_chain_service: ServiceRef<BlockConnectorService>,
     vm_metrics: Option<VMMetrics>,
 ) -> anyhow::Result<BlockChain> 
 where
@@ -248,6 +250,7 @@ where
                 skip_pow_verify_when_sync,
                 accumulator_root,
                 Some(dag.clone()),
+                block_chain_service.clone(),
             ),
             event_handle.clone(),
             ext_error_handle,
@@ -277,6 +280,7 @@ pub fn sync_dag_full_task(
     network: NetworkServiceRef,
     skip_pow_verify_when_sync: bool,
     dag: Arc<Mutex<BlockDAG>>,
+    block_chain_service: ServiceRef<BlockConnectorService>,
 ) -> anyhow::Result<(
     BoxFuture<'static, anyhow::Result<BlockChain, TaskError>>,
     TaskHandle,
@@ -287,6 +291,8 @@ pub fn sync_dag_full_task(
     let task_event_handle = event_handle.clone();
     let all_fut = async move {
 
+        info!("jacktest********** local_accumulator_info: {:?}", local_accumulator_info);
+        info!("jacktest********** targe_accumulator_info: {:?}", target_accumulator_info);
         let ancestor = find_dag_ancestor_task(
             local_accumulator_info.clone(),
             target_accumulator_info.clone(),
@@ -296,6 +302,8 @@ pub fn sync_dag_full_task(
             task_event_handle.clone(),
         ).await.map_err(|err| TaskError::BreakError(anyhow!(err)))?;
 
+        info!("jacktest********** ancestor find: {:?}", ancestor);
+
         let (start_index, accumulator) = sync_accumulator(
             ancestor,
             target_accumulator_info,
@@ -303,6 +311,8 @@ pub fn sync_dag_full_task(
             accumulator_store.clone(),
             accumulator_snapshot.clone(),
         ).await.map_err(|err| TaskError::BreakError(anyhow!(err)))?;
+
+        info!("jacktest********** target accumulator info: {:?}, star index: {}", accumulator.get_info(), start_index);
 
         let block_chain = sync_dag_block(
                             start_index,
@@ -315,8 +325,12 @@ pub fn sync_dag_full_task(
                             network,
                             skip_pow_verify_when_sync,
                             dag.clone(),
+                            block_chain_service.clone(),
                             vm_metrics,
                         ).await.map_err(|err| TaskError::BreakError(anyhow!(err)))?;
+
+        info!("jacktest********** block info sync: {:?}, its dag accumulator info: {:?}", block_chain.status(), block_chain.get_current_dag_accumulator_info());
+
         return anyhow::Result::Ok(block_chain);
     };
 
