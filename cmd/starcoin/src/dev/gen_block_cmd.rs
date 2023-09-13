@@ -1,6 +1,8 @@
 // Copyright (c) The Starcoin Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use std::time::Duration;
+
 use crate::cli_state::CliState;
 use crate::view::{ExecuteResultView, TransactionOptions};
 use crate::StarcoinOpt;
@@ -37,7 +39,15 @@ impl CommandAction for GenBlockCommand {
             ..Default::default()
         };
         let mut result = std::result::Result::Err(anyhow!("the transaction is not executed yet!"));
-        for _i in 1..=12 {
+        for i in 1..=12000 {
+            if i % 50 == 0 {
+                let account_client = ctx.state().account_client();
+                    let account_address = ctx.state().default_account()?.address;
+
+                let duration = Duration::from_secs(6400);
+                let _account =
+                    account_client.unlock_account(account_address, "".to_string(), duration)?;
+            } 
             result = ctx.state()
                 .build_and_execute_transaction(txn_opts.clone(), TransactionPayload::ScriptFunction(empty.clone()));
         }

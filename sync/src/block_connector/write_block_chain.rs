@@ -796,7 +796,7 @@ where
         // connect the block one by one
         dag_blocks
             .into_iter()
-            .for_each(|(block, dag_block_parents)| {
+            .try_fold((),|_, (block, dag_block_parents)| {
                 let next_transaction_parent = block.header().id();
                 let result = self.connect_to_main(
                     block,
@@ -808,12 +808,13 @@ where
                     std::result::Result::Ok(connect_ok) => {
                         executed_blocks.push((connect_ok.block().clone(), dag_block_parents));
                         dag_block_next_parent = next_transaction_parent;
+                        Ok(())
                     }
                     Err(error) => {
-                        error!("apply_and_select_head failed, error: {}", error.to_string())
+                        bail!("apply_and_select_head failed, error: {}", error.to_string())
                     }
                 }
-            });
+            })?;
 
         match next_tips {
             Some(new_tips) => {
@@ -823,8 +824,7 @@ where
 
                 // 1, write to disc
                 self.main
-                    .append_dag_accumulator_leaf(new_tips.clone())
-                    .expect("failed to append new tips to dag accumulator");
+                    .append_dag_accumulator_leaf(new_tips.clone())?;
 
                 // 2, broadcast the blocks sorted by their id
                 executed_blocks
