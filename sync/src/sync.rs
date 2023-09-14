@@ -242,7 +242,6 @@ impl SyncService {
             let startup_info = storage
                 .get_startup_info()?
                 .ok_or_else(|| format_err!("Startup info should exist."))?;
-            info!("jacktest********** startup info read: {:?}", startup_info);
             let current_block_id = startup_info.main;
             let current_block_info =
                 storage.get_block_info(current_block_id)?.ok_or_else(|| {
@@ -344,19 +343,16 @@ impl SyncService {
                         let startup_info = test_storage
                         .get_startup_info().unwrap()
                         .ok_or_else(|| format_err!("Startup info should exist.")).unwrap();
-                        info!("jacktest********** after sync, startup info read: {:?}", startup_info);
                         let current_block_id = startup_info.main;
 
                         let local_dag_accumulator_info = test_storage
                         .get_dag_accumulator_info(current_block_id).unwrap()
                         .expect("current dag accumulator info should exist");
 
-                        info!("jacktest********** after sync, local_dag_accumulator_info: {:?}", local_dag_accumulator_info);
-
                         if let Some(sync_task_total) = sync_task_total.as_ref() {
                             sync_task_total.with_label_values(&["done"]).inc();
                         }
-                        true // temporarily set to true
+                        false
                     }
                     Ok(None) => {
                         debug!("[sync] Check sync task return none, do not need sync.");
@@ -685,8 +681,6 @@ impl ServiceHandler<Self, SyncStatusRequest> for SyncService {
         self.sync_status.clone()
     }
 }
-
-
 
 impl ServiceHandler<Self, PeerScoreRequest> for SyncService {
     fn handle(

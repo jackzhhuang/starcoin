@@ -417,7 +417,6 @@ impl BlockChain {
         dag_block_parent: Option<HashValue>,
         vm_metrics: Option<VMMetrics>,
     ) -> Result<ExecutedBlock> {
-        info!("jacktest************** execute_block_and_save, block number{}", block.header().number());
         let header = block.header();
         debug_assert!(header.is_genesis() || parent_status.is_some());
         debug_assert!(!header.is_genesis() || parent_status.is_none());
@@ -566,7 +565,6 @@ impl BlockChain {
         storage.save_block_info(block_info.clone())?;
 
         watch(CHAIN_WATCH_NAME, "n26");
-        info!("jacktest************** finish to execute_block_and_save, block number{}", block.header().number());
         Ok(ExecutedBlock {
             block,
             block_info,

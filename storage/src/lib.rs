@@ -731,7 +731,6 @@ impl SyncFlexiDagStore for Storage {
         // for sync
         if self.flexi_dag_storage.get_hashes_by_hash(key)?.is_some() {
             if let Some(t) = self.flexi_dag_storage.get_hashes_by_hash(key)? {
-                info!("jacktest************ the old one: {:?}, new one {:?}", t, snapshot);
                 if t != snapshot {
                     bail!("the accumulator differ from other");
                 }
@@ -742,9 +741,8 @@ impl SyncFlexiDagStore for Storage {
         // for block chain
         new_tips.iter().try_fold((), |_, block_id| {
             if let Some(t) = self.flexi_dag_storage.get_hashes_by_hash(block_id.clone())? {
-                info!("jacktest************ the old one: {:?}, new one {:?}", t, snapshot);
                 if t != snapshot {
-                    panic!("the key {} should not exists", block_id);
+                    bail!("the key {} should not exists", block_id);
                 }
             }
             self.flexi_dag_storage

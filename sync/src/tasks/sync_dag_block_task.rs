@@ -87,7 +87,6 @@ impl SyncDagBlockTask {
             .await?
             .iter()
             .map(|(block, peer_info, parents, transaction_header)| {
-                info!("jacktest********** fetch block number: {}, id: {}", block.header().number(), block.id());
                 (
                     block.header().id(),
                     (

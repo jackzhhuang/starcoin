@@ -326,7 +326,6 @@ where
         } else {
             self.chain.apply(block.clone(), dag_parent, next_tips)
         };
-        info!("jacktest****************** block {} apply result {:?}", block.header().number(), apply_result);
         if let Err(err) = apply_result {
             let error_msg = err.to_string();
             error!(
@@ -425,7 +424,6 @@ where
             Some(block_info) => {
                 //If block_info exists, it means that this block was already executed and try connect in the previous sync, but the sync task was interrupted.
                 //So, we just need to update chain and continue
-                info!("jacktest**************** to self.chain.connect, block number: {}", block.header().number());
                 self.chain.connect(
                     ExecutedBlock {
                         block: block.clone(),
@@ -443,7 +441,6 @@ where
                 Ok(block_info)
             }
             None => {
-                info!("jacktest**************** to self.apply_block, block number: {}", block.header().number());
                 self.apply_block(block.clone(), peer_id, dag_transaction_header, next_tips)?;
                 self.chain.time_service().adjust(timestamp);
                 let block_info = self.chain.status().info;

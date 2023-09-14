@@ -250,7 +250,6 @@ where
         new_branch: BlockChain,
         dag_block_parents: Option<Vec<HashValue>>,
     ) -> Result<()> {
-        info!("jacktest************ in select head for switch branch");
         let executed_block = new_branch.head_block();
         let main_total_difficulty = self.main.get_total_difficulty()?;
         let branch_total_difficulty = new_branch.get_total_difficulty()?;
@@ -260,7 +259,6 @@ where
         );
 
         if branch_total_difficulty > main_total_difficulty {
-            info!("jacktest************ in select head for switch branch, branch_total_difficulty{} > main_total_difficulty{}", branch_total_difficulty, main_total_difficulty);
             let (enacted_count, enacted_blocks, retracted_count, retracted_blocks) = if dag_block_parents.is_some() {
                 // for dag
                 self.find_ancestors_from_dag_accumulator(&new_branch)?
@@ -308,7 +306,6 @@ where
         }
         debug_assert!(!enacted_blocks.is_empty());
         debug_assert_eq!(enacted_blocks.last().unwrap().header, executed_block.block().header);
-        info!("jacktest********** executed_block.block().header(): {:?}", executed_block.block().header());
         self.update_startup_info(executed_block.block().header())?;
         if retracted_count > 0 {
             if let Some(metrics) = self.metrics.as_ref() {
@@ -320,7 +317,7 @@ where
             .net()
             .time_service()
             .adjust(executed_block.header().timestamp());
-        info!("jacktest******** [chain] Select new head, id: {}, number: {}, total_difficulty: {}, enacted_block_count: {}, retracted_block_count: {}", executed_block.header().id(), executed_block.header().number(), executed_block.block_info().total_difficulty, enacted_count, retracted_count);
+        info!("[chain] Select new head, id: {}, number: {}, total_difficulty: {}, enacted_block_count: {}, retracted_block_count: {}", executed_block.header().id(), executed_block.header().number(), executed_block.block_info().total_difficulty, enacted_count, retracted_count);
 
         if let Some(metrics) = self.metrics.as_ref() {
             metrics
@@ -418,9 +415,7 @@ where
             return true;
         }
 
-        info!("jacktest************* is_main_head");
         if let Some(block_parents) = dag_block_parents {
-            info!("jacktest************* is_main_head: main head tips: {:?}, new block parents: {:?}", self.main.status().tips_hash, block_parents);
             if self.main.status().tips_hash.is_some() && !block_parents.is_empty() {
                 return block_parents.into_iter().all(|block_header| {
                     self.main
@@ -432,7 +427,6 @@ where
             }
         }
 
-        info!("jacktest************ is main head return false");
         return false;
     }
 
@@ -449,14 +443,12 @@ where
 
 
     fn find_ancestors_from_dag_accumulator(&self, new_branch: &BlockChain) -> Result<(u64, Vec<Block>, u64, Vec<Block>)> {
-        info!("jacktest******** enter find_ancestors_from_dag_accumulator");
         let mut min_leaf_index = std::cmp::min(self.main.get_dag_current_leaf_number()?, new_branch.get_dag_current_leaf_number()?) - 1;
 
         let mut retracted = vec![];
         let mut enacted = vec![];
 
         loop {
-            info!("jacktest******** enter find_ancestors_from_dag_accumulator, index = {}", min_leaf_index);
             if min_leaf_index == 0 {
                 break;
             }
@@ -625,12 +617,10 @@ where
             //block has been processed in some branch, so just trigger a head selection.
             (Some(block_info), Some(branch)) => {
                 // both are different, select one
-                
-                info!(
-                    "jacktest*************** Block number {} has been processed, trigger head selection, branch total_difficulty: {}, main total_diffculty: {}",
-                    block.header().number(),
-                    branch.get_total_difficulty()?,
-                    self.main.get_total_difficulty()?,
+                debug!(
+                    "Block {} has been processed, trigger head selection, total_difficulty: {}",
+                    block_info.block_id(),
+                    branch.get_total_difficulty()?
                 );
                 let exe_block = branch.head_block();
                 self.select_head(branch, dag_block_parents)?;
@@ -641,9 +631,6 @@ where
             }
             //block has been processed, and its parent is main chain, so just connect it to main chain.
             (Some(block_info), None) => {
-                info!("jacktest*************** in (Some(block_info), None), block number: {}",
-                    block.header().number(),
-                );
                 // both are identical
                 let block_id: HashValue = block_info.block_id().clone();
                 let executed_block = self.main.connect(
@@ -662,7 +649,6 @@ where
                 Ok(ConnectOk::Connect(executed_block))
             }
             (None, Some(mut branch)) => {
-                info!("jacktest*************** in (None, Some(mut branch))");
                 // the block is not in the block, but the parent is
                 let result = branch.apply(block, dag_block_next_parent, next_tips);
                 let executed_block = result?;
@@ -705,11 +691,6 @@ where
             );
             match color {
                 ColoringOutput::Blue(_, _) => {
-                    info!("jacktest******************before apply or switch: main tips: {:?}, hash: {:?}, \
-                        block parents hash: {:?}, main block number: {}, block number: {}"
-                        , self.main.status().tips_hash, self.main.current_tips_hash(), block.header().parent_hash(),
-                        self.main.status().head.number(), block.header().number() 
-                );
                     if self
                         .main
                         .current_tips_hash()
@@ -717,7 +698,6 @@ where
                         == block.header().parent_hash()
                         && !self.block_exist(block_id)?
                     {
-                        info!("jacktest********** apply and select head, block head: {:?}", block.header());
                         return self.apply_and_select_head(
                             block,
                             Some(parents),
@@ -725,7 +705,6 @@ where
                             next_tips,
                         );
                     }
-                    info!("jacktest********** swtich branch: {:?}", block.header());
                     self.switch_branch(block, Some(parents), dag_block_next_parent, next_tips)
                 }
                 ColoringOutput::Red => {

@@ -559,13 +559,11 @@ impl ReadableChainService for ChainReaderServiceInner {
         let mut details = [].to_vec();
         for index in req.leaf_index..=end_index {
             let snapshot = self.main.get_dag_accumulator_snapshot_by_index(index)?;
-            info!("jacktest************index: {}, info: {:?}", index, snapshot.accumulator_info);
             details.push(TargetDagAccumulatorLeafDetail {
                 accumulator_root: snapshot.accumulator_info.accumulator_root,
                 tips: snapshot.child_hashes,
             });
         }
-        info!("jacktest************req: {:?}, details: {:?}", req, details);
         Ok(details)
     }
 }

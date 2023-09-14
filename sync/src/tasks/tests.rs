@@ -33,7 +33,6 @@ use starcoin_types::{
     block::{Block, BlockBody, BlockHeaderBuilder, BlockIdAndNumber, BlockInfo},
     U256,
 };
-use starcoin_vm_types::effects::Op;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use stream_task::{
