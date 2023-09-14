@@ -296,6 +296,16 @@ where
         retracted_count: u64,
         retracted_blocks: Vec<Block>,
     ) -> Result<()> {
+        if enacted_blocks.is_empty() {
+            error!("enacted_blocks is empty.");
+            bail!("enacted_blocks is empty.");
+        }
+        if enacted_blocks.last().unwrap().header != executed_block.block().header {
+            error!("enacted_blocks.last().unwrap().header: {:?}, executed_block.block().header: {:?} are different!", 
+                    enacted_blocks.last().unwrap().header, executed_block.block().header);
+            bail!("enacted_blocks.last().unwrap().header: {:?}, executed_block.block().header: {:?} are different!", 
+                    enacted_blocks.last().unwrap().header, executed_block.block().header);
+        }
         debug_assert!(!enacted_blocks.is_empty());
         debug_assert_eq!(enacted_blocks.last().unwrap().header, executed_block.block().header);
         info!("jacktest********** executed_block.block().header(): {:?}", executed_block.block().header());
