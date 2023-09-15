@@ -449,6 +449,19 @@ where
         let mut retracted = vec![];
         let mut enacted = vec![];
 
+        let snapshot = new_branch.get_dag_accumulator_snapshot(new_branch.head_block().header().id())?;
+        let mut children = snapshot.child_hashes.clone();
+        children.sort();
+        for child in children {
+            match self
+            .storage
+            .get_block(child)? {
+                Some(block) => enacted.push(block),
+                None => bail!("the block{} dose not exist in new branch, ignore", child.clone()),
+            }
+        }
+        enacted.reverse();
+
         loop {
             if min_leaf_index == 0 {
                 break;
@@ -468,7 +481,7 @@ where
                 if let anyhow::Result::Ok(Some(block)) = block {
                     rollback_blocks.push(block);
                 } else {
-                    warn!("the block{} dose not exist in main branch, ignore", child.clone());
+                    bail!("the block{} dose not exist in main branch, ignore", child.clone());
                 }
                 return Ok(rollback_blocks);
             })?.into_iter());
@@ -483,7 +496,7 @@ where
                 if let anyhow::Result::Ok(Some(block)) = block {
                     rollback_blocks.push(block);
                 } else {
-                    warn!("the block{} dose not exist in new branch, ignore", child.clone());
+                    bail!("the block{} dose not exist in new branch, ignore", child.clone());
                 }
                 return Ok(rollback_blocks);
             })?.into_iter());
