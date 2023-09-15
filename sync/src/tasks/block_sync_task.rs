@@ -424,7 +424,6 @@ where
             Some(block_info) => {
                 //If block_info exists, it means that this block was already executed and try connect in the previous sync, but the sync task was interrupted.
                 //So, we just need to update chain and continue
-                info!("jacktest failed to apply, now to connect again block number: {}", block.header().number());
                 self.chain.connect(
                     ExecutedBlock {
                         block: block.clone(),
@@ -437,20 +436,17 @@ where
                 let total_difficulty = block_info.get_total_difficulty();
                 // only try connect block when sync chain total_difficulty > node's current chain.
                 if total_difficulty > self.current_block_info.total_difficulty {
-                    info!("jacktest failed to apply, now to connect again block number: {},send new header", block.header().number());
                     async_std::task::block_on(self.block_chain_service.send(NewBlockChainRequest { new_head_block: block_id  }))??;
                 }
                 Ok(block_info)
             }
             None => {
-                info!("jacktest  now apply, block number: {}", block.header().number());
                 self.apply_block(block.clone(), peer_id, dag_transaction_header, next_tips)?;
                 self.chain.time_service().adjust(timestamp);
                 let block_info = self.chain.status().info;
                 let total_difficulty = block_info.get_total_difficulty();
                 // only try connect block when sync chain total_difficulty > node's current chain.
                 if total_difficulty > self.current_block_info.total_difficulty {
-                    info!("jacktest  now apply, block number: {}, success to apply, now send connect request", block.header().number());
                     async_std::task::block_on(self.block_chain_service.send(BlockConnectedRequest { block, dag_parents }))??;
                     // if let Err(e) = self
                     //     .event_handle

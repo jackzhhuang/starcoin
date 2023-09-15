@@ -313,7 +313,6 @@ impl ServiceHandler<Self, BlockConnectedRequest> for BlockConnectorService {
 
         let block = msg.block;
         let result = self.chain_service.try_connect(block, msg.dag_parents);
-        info!("jacktest BlockConnectedRequest, try connect error: {:?}", result);
         result
     }
 }

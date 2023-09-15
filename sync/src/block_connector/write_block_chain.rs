@@ -298,7 +298,6 @@ where
             error!("enacted_blocks is empty.");
             bail!("enacted_blocks is empty.");
         }
-        info!("jacktest will update_startup_info, block number: {}", executed_block.block().header().number());
         if enacted_blocks.last().unwrap().header != executed_block.block().header {
             error!("enacted_blocks.last().unwrap().header: {:?}, executed_block.block().header: {:?} are different!", 
                     enacted_blocks.last().unwrap().header, executed_block.block().header);
@@ -712,7 +711,6 @@ where
                         == block.header().parent_hash()
                         && !self.block_exist(block_id)?
                     {
-                        info!("jacktest self.apply_and_select_head, block number {}", block.header.number());
                         return self.apply_and_select_head(
                             block,
                             Some(parents),
@@ -720,7 +718,6 @@ where
                             next_tips,
                         );
                     }
-                    info!("jacktest self.switch_branch, block number {}", block.header.number());
                     self.switch_branch(block, Some(parents), dag_block_next_parent, next_tips)
                 }
                 ColoringOutput::Red => {
