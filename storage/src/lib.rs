@@ -731,6 +731,7 @@ impl SyncFlexiDagStore for Storage {
         // for sync
         if self.flexi_dag_storage.get_hashes_by_hash(key)?.is_some() {
             if let Some(t) = self.flexi_dag_storage.get_hashes_by_hash(key)? {
+                info!("jacktest t: {:?}, self: {:?}", t, self.flexi_dag_storage.get_hashes_by_hash(key)?);
                 if t != snapshot {
                     bail!("the accumulator differ from other");
                 }

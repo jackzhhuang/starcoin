@@ -298,6 +298,7 @@ where
             error!("enacted_blocks is empty.");
             bail!("enacted_blocks is empty.");
         }
+        info!("jacktest will update_startup_info, block number: {}", executed_block.block().header().number());
         if enacted_blocks.last().unwrap().header != executed_block.block().header {
             error!("enacted_blocks.last().unwrap().header: {:?}, executed_block.block().header: {:?} are different!", 
                     enacted_blocks.last().unwrap().header, executed_block.block().header);
@@ -698,6 +699,7 @@ where
                         == block.header().parent_hash()
                         && !self.block_exist(block_id)?
                     {
+                        info!("jacktest self.apply_and_select_head, block number {}", block.header.number());
                         return self.apply_and_select_head(
                             block,
                             Some(parents),
@@ -705,6 +707,7 @@ where
                             next_tips,
                         );
                     }
+                    info!("jacktest self.switch_branch, block number {}", block.header.number());
                     self.switch_branch(block, Some(parents), dag_block_next_parent, next_tips)
                 }
                 ColoringOutput::Red => {
@@ -861,28 +864,43 @@ where
                     bail!("no new block has been executed successfully!");
                 }
 
-                // 1, write to disc
-                self.main
-                    .append_dag_accumulator_leaf(new_tips.clone())?;
+                let mut connected = self.main.is_head_of_dag_accumulator(new_tips.clone())?;
+                if self.main.dag_parents_in_tips(new_tips.clone())? {
+                    // 1, write to disc
+                    if !connected {
+                        self.main
+                            .append_dag_accumulator_leaf(new_tips.clone())?;
+                        connected = true;
+                    }
+                }
 
-                // 2, broadcast the blocks sorted by their id
-                executed_blocks
-                    .iter()
-                    .for_each(|(exe_block, dag_block_parents)| {
-                        if let Some(block) = exe_block {
-                            self.broadcast_new_head(
-                                block.clone(),
-                                Some(dag_block_parents.clone()),
-                                Some(new_tips.clone()),
-                            );
-                        }
-                    });
+                if  connected {
+                    // 2, broadcast the blocks sorted by their id
+                    executed_blocks
+                        .iter()
+                        .for_each(|(exe_block, dag_block_parents)| {
+                            if let Some(block) = exe_block {
+                                self.broadcast_new_head(
+                                    block.clone(),
+                                    Some(dag_block_parents.clone()),
+                                    Some(new_tips.clone()),
+                                );
+                            }
+                        });
+                }
+
                 return executed_blocks
                     .last()
                     .map(|(exe_block, _)| {
-                        ConnectOk::ExeConnectMain(
-                            exe_block.as_ref().expect("exe block should not be None!").clone(),
-                        )
+                        if connected {
+                            ConnectOk::ExeConnectMain(
+                                exe_block.as_ref().expect("exe block should not be None!").clone(),
+                            )
+                        } else {
+                            ConnectOk::ExeConnectBranch(
+                                exe_block.as_ref().expect("exe block should not be None!").clone(),
+                            )
+                        }
                     })
                     .ok_or_else(|| format_err!("no block has been executed successfully!"));
             }
