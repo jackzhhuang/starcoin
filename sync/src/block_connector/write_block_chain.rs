@@ -10,7 +10,7 @@ use starcoin_crypto::HashValue;
 use starcoin_executor::VMMetrics;
 use starcoin_logger::prelude::*;
 use starcoin_service_registry::bus::{Bus, BusService};
-use starcoin_service_registry::ServiceRef;
+use starcoin_service_registry::{ServiceContext, ServiceRef};
 use starcoin_storage::Store;
 use starcoin_txpool_api::TxPoolSyncService;
 use starcoin_types::block::BlockInfo;
@@ -21,6 +21,8 @@ use starcoin_types::{
 };
 use std::fmt::Formatter;
 use std::sync::Arc;
+
+use super::BlockConnectorService;
 
 const MAX_ROLL_BACK_BLOCK: usize = 10;
 
@@ -167,6 +169,32 @@ where
 
     pub fn get_main(&self) -> &BlockChain {
         &self.main
+    }
+
+    // for sync task to connect to its chain, if chain's total difficulties is larger than the main
+    // switch by:
+    // 1, update the startup info
+    // 2, broadcast the new header
+    pub fn switch_new_main(
+        &mut self,
+        new_head_block: HashValue,
+        ctx: &mut ServiceContext<BlockConnectorService>,
+    ) -> Result<()> {
+        let new_branch = BlockChain::new(
+            self.config.net().time_service(),
+            new_head_block,
+            self.storage.clone(),
+            self.vm_metrics.clone(),
+        )?;
+
+        let main_total_difficulty = self.main.get_total_difficulty()?;
+        let branch_total_difficulty = new_branch.get_total_difficulty()?;
+        if branch_total_difficulty > main_total_difficulty {
+            self.update_startup_info(new_branch.head_block().header())?;
+
+            ctx.broadcast(NewHeadBlock(Arc::new(new_branch.head_block())));
+        }
+        Ok(())
     }
 
     pub fn select_head(&mut self, new_branch: BlockChain) -> Result<()> {

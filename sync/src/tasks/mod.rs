@@ -381,9 +381,20 @@ impl BlockLocalStore for Arc<dyn Store> {
 }
 
 #[derive(Clone, Debug)]
+pub enum BlockConnectAction {
+    ConnectNewBlock,
+    ConnectExecutedBlock,
+}
+
+#[derive(Clone, Debug)]
 pub struct BlockConnectedEvent {
     pub block: Block,
+    pub feedback: Option<futures::channel::mpsc::UnboundedSender<BlockConnectedFinishEvent>>,
+    pub action: BlockConnectAction,
 }
+
+#[derive(Clone, Debug)]
+pub struct BlockConnectedFinishEvent;
 
 #[derive(Clone, Debug)]
 pub struct BlockDiskCheckEvent {}

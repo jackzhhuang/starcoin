@@ -3,7 +3,7 @@
 
 use crate::block_connector::{ExecuteRequest, ResetRequest, WriteBlockChainService};
 use crate::sync::{CheckSyncEvent, SyncService};
-use crate::tasks::{BlockConnectedEvent, BlockDiskCheckEvent};
+use crate::tasks::{BlockConnectedEvent, BlockConnectedFinishEvent, BlockDiskCheckEvent};
 use anyhow::{format_err, Result};
 use network_api::PeerProvider;
 use starcoin_chain_api::{ConnectBlockError, WriteableChainService};
@@ -165,15 +165,28 @@ impl EventHandler<Self, BlockConnectedEvent> for BlockConnectorService {
     fn handle_event(
         &mut self,
         msg: BlockConnectedEvent,
-        _ctx: &mut ServiceContext<BlockConnectorService>,
+        ctx: &mut ServiceContext<BlockConnectorService>,
     ) {
         //because this block has execute at sync task, so just try connect to select head chain.
         //TODO refactor connect and execute
 
         let block = msg.block;
-        if let Err(e) = self.chain_service.try_connect(block) {
-            error!("Process connected block error: {:?}", e);
+        let feedback = msg.feedback;
+
+        match msg.action {
+            crate::tasks::BlockConnectAction::ConnectNewBlock => {
+                if let Err(e) = self.chain_service.try_connect(block) {
+                    error!("Process connected new block from sync error: {:?}", e);
+                }
+            }
+            crate::tasks::BlockConnectAction::ConnectExecutedBlock => {
+                if let Err(e) = self.chain_service.switch_new_main(block.header().id(), ctx) {
+                    error!("Process connected executed block from sync error: {:?}", e);
+                }
+            }
         }
+
+        feedback.map(|f| f.unbounded_send(BlockConnectedFinishEvent));
     }
 }
 
