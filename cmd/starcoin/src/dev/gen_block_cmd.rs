@@ -6,7 +6,7 @@ use std::time::Duration;
 use crate::cli_state::CliState;
 use crate::view::{ExecuteResultView, TransactionOptions};
 use crate::StarcoinOpt;
-use anyhow::{ensure, Result, anyhow};
+use anyhow::{anyhow, ensure, Result};
 use clap::Parser;
 use scmd::{CommandAction, ExecContext};
 use starcoin_transaction_builder::build_empty_script;
@@ -42,14 +42,16 @@ impl CommandAction for GenBlockCommand {
         for i in 1..=12000 {
             if i % 50 == 0 {
                 let account_client = ctx.state().account_client();
-                    let account_address = ctx.state().default_account()?.address;
+                let account_address = ctx.state().default_account()?.address;
 
                 let duration = Duration::from_secs(6400);
                 let _account =
                     account_client.unlock_account(account_address, "".to_string(), duration)?;
-            } 
-            result = ctx.state()
-                .build_and_execute_transaction(txn_opts.clone(), TransactionPayload::ScriptFunction(empty.clone()));
+            }
+            result = ctx.state().build_and_execute_transaction(
+                txn_opts.clone(),
+                TransactionPayload::ScriptFunction(empty.clone()),
+            );
         }
         return result;
     }
