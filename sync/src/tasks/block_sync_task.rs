@@ -433,9 +433,9 @@ where
         let last_index = broadcast_blocks.len() - 1;
         broadcast_blocks.into_iter().enumerate().for_each(|(index, (block, block_info, dag_parents, action))| {
             if last_index == index && state == CollectorState::Enough {
-                self.notify_connected_block(block, block_info, action, CollectorState::Enough, dag_parents);
+                let _ = self.notify_connected_block(block, block_info, action, CollectorState::Enough, dag_parents);
             } else {
-                self.notify_connected_block(block, block_info, action, CollectorState::Need, dag_parents);
+                let _ = self.notify_connected_block(block, block_info, action, CollectorState::Need, dag_parents);
             }
         });
 
