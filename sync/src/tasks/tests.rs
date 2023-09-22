@@ -3,16 +3,14 @@
 
 #![allow(clippy::integer_arithmetic)]
 use crate::tasks::block_sync_task::SyncBlockData;
-use crate::tasks::mock::{
-    ErrorStrategy, MockBlockIdFetcher, SyncNodeMocker,
-};
+use crate::tasks::mock::{ErrorStrategy, MockBlockIdFetcher, SyncNodeMocker};
 use crate::tasks::{
     full_sync_task, AccumulatorCollector, AncestorCollector, BlockAccumulatorSyncTask,
     BlockCollector, BlockFetcher, BlockLocalStore, BlockSyncTask, FindAncestorTask, SyncFetcher,
 };
 use crate::verified_rpc_client::RpcVerifyError;
-use anyhow::{Context, Ok};
 use anyhow::{format_err, Result};
+use anyhow::{Context, Ok};
 use futures::channel::mpsc::unbounded;
 use futures::future::BoxFuture;
 use futures::FutureExt;
@@ -996,34 +994,48 @@ fn sync_block_in_async_connection(
     storage: Arc<Storage>,
     block_count: u64,
 ) -> Result<Arc<SyncNodeMocker>> {
-    Arc::get_mut(&mut target_node).unwrap().produce_block(block_count)?;
+    Arc::get_mut(&mut target_node)
+        .unwrap()
+        .produce_block(block_count)?;
     let target = target_node.sync_target();
     let target_id = target.target_id.id();
 
     let (sender, mut receiver) = futures::channel::mpsc::unbounded::<BlockConnectedEvent>();
     let thread_local_node = local_node.clone();
 
-    let process_block = move|| {
-        let mut chain = MockChain::new_with_storage(thread_local_node.chain_mocker.net().clone(), 
+    let process_block = move || {
+        let mut chain = MockChain::new_with_storage(
+            thread_local_node.chain_mocker.net().clone(),
             storage.clone(),
-            thread_local_node.chain_mocker.head().status().head.id().clone(),
+            thread_local_node
+                .chain_mocker
+                .head()
+                .status()
+                .head
+                .id()
+                .clone(),
             thread_local_node.chain_mocker.miner().clone(),
-        ).unwrap();
+        )
+        .unwrap();
         loop {
             match receiver.try_next() {
-                std::result::Result::Ok(result) => {
-                    match result {
-                        Some(event) => {
-                            chain.select_head(event.block).expect("select head must be successful");
-                            if event.feedback.is_some() {
-                                event.feedback.unwrap().unbounded_send(super::BlockConnectedFinishEvent).unwrap();
-                                assert_eq!(target_id, chain.head().status().head.id());
-                                break;
-                            }
+                std::result::Result::Ok(result) => match result {
+                    Some(event) => {
+                        chain
+                            .select_head(event.block)
+                            .expect("select head must be successful");
+                        if event.feedback.is_some() {
+                            event
+                                .feedback
+                                .unwrap()
+                                .unbounded_send(super::BlockConnectedFinishEvent)
+                                .unwrap();
+                            assert_eq!(target_id, chain.head().status().head.id());
+                            break;
                         }
-                        None => break,
                     }
-                }
+                    None => break,
+                },
                 Err(_) => (),
             }
         }
@@ -1069,11 +1081,18 @@ async fn test_sync_block_in_async_connection() -> Result<()> {
     let mut target_node = Arc::new(SyncNodeMocker::new(net.clone(), 1, 0)?);
 
     let (storage, chain_info, _) =
-    Genesis::init_storage_for_test(&net).expect("init storage by genesis fail.");
-    let local_node = Arc::new(SyncNodeMocker::new_with_storage(net.clone(), storage.clone(), chain_info.clone(), AccountInfo::random(), 1, 0)?);
+        Genesis::init_storage_for_test(&net).expect("init storage by genesis fail.");
+    let local_node = Arc::new(SyncNodeMocker::new_with_storage(
+        net.clone(),
+        storage.clone(),
+        chain_info.clone(),
+        AccountInfo::random(),
+        1,
+        0,
+    )?);
 
-   
-    target_node = sync_block_in_async_connection(target_node, local_node.clone(), storage.clone(), 10)?;
+    target_node =
+        sync_block_in_async_connection(target_node, local_node.clone(), storage.clone(), 10)?;
     _ = sync_block_in_async_connection(target_node, local_node.clone(), storage.clone(), 20)?;
 
     Ok(())

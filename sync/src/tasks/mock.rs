@@ -4,7 +4,7 @@
 use crate::tasks::{
     BlockConnectedEvent, BlockFetcher, BlockIdFetcher, BlockInfoFetcher, PeerOperator, SyncFetcher,
 };
-use anyhow::{format_err, Context, Result, Ok};
+use anyhow::{format_err, Context, Ok, Result};
 use async_std::task::JoinHandle;
 use futures::channel::mpsc::UnboundedReceiver;
 use futures::future::BoxFuture;
@@ -173,7 +173,8 @@ impl SyncNodeMocker {
         delay_milliseconds: u64,
         random_error_percent: u32,
     ) -> Result<Self> {
-        let chain = MockChain::new_with_storage(net, storage, chain_info.head().id().clone(), miner)?;
+        let chain =
+            MockChain::new_with_storage(net, storage, chain_info.head().id().clone(), miner)?;
         let peer_id = PeerId::random();
         let peer_info = PeerInfo::new(
             peer_id.clone(),
@@ -191,8 +192,6 @@ impl SyncNodeMocker {
             peer_selector,
         ))
     }
-
-
 
     pub fn new_with_strategy(
         net: ChainNetwork,
