@@ -1128,7 +1128,7 @@ fn sync_block_in_block_connection_service_mock(
         false,
         local_net.time_service(),
         storage.clone(),
-        async_std::task::block_on(registry.service_ref::<BlockConnectorService<TxPoolService>>())?.clone(),
+        async_std::task::block_on(registry.service_ref::<BlockConnectorService<MockTxPoolService>>())?.clone(),
         target_node.clone(),
         local_ancestor_sender,
         DummyNetworkService::default(),
@@ -1185,13 +1185,14 @@ async fn test_sync_chain_service_mock() -> Result<()> {
 
             registry.put_shared(config.clone()).await.unwrap();
             registry.put_shared(storage.clone()).await.unwrap();
+            registry.put_shared(MockTxPoolService::new()).await.unwrap();
 
-            let _txpool_service = registry.register::<TxPoolActorService>().await.unwrap();
+            // let _txpool_service = registry.register::<TxPoolActorService>().await.unwrap();
 
             Delay::new(Duration::from_secs(2)).await;
 
             registry
-                .register::<BlockConnectorService<TxPoolService>>()
+                .register::<BlockConnectorService<MockTxPoolService>>()
                 .await.unwrap();
 
             registry_sender.send(registry).await.unwrap();
