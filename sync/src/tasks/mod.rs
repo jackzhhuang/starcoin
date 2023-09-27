@@ -1,10 +1,11 @@
 // Copyright (c) The Starcoin Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::block_connector::BlockConnectorService;
 use crate::tasks::block_sync_task::SyncBlockData;
 use crate::tasks::inner_sync_task::InnerSyncTask;
 use crate::verified_rpc_client::{RpcVerifyError, VerifiedRpcClient};
-use anyhow::{format_err, Error, Result};
+use anyhow::{format_err, Error, Result, bail};
 use futures::channel::mpsc::UnboundedSender;
 use futures::future::BoxFuture;
 use futures::{FutureExt, TryFutureExt};
@@ -19,6 +20,9 @@ use starcoin_service_registry::{ActorService, EventHandler, ServiceRef};
 use starcoin_storage::Store;
 use starcoin_sync_api::SyncTarget;
 use starcoin_time_service::TimeService;
+use starcoin_txpool::TxPoolService;
+#[cfg(test)]
+use starcoin_txpool_mock_service::MockTxPoolService;
 use starcoin_types::block::{Block, BlockIdAndNumber, BlockInfo, BlockNumber};
 use starcoin_types::startup_info::ChainStatus;
 use starcoin_types::U256;
@@ -403,13 +407,31 @@ pub trait BlockConnectedEventHandle: Send + Clone + std::marker::Unpin {
     fn handle(&mut self, event: BlockConnectedEvent) -> Result<()>;
 }
 
-impl<S> BlockConnectedEventHandle for ServiceRef<S>
-where
-    S: ActorService + EventHandler<S, BlockConnectedEvent>,
+impl BlockConnectedEventHandle for ServiceRef<BlockConnectorService<TxPoolService>>
 {
     fn handle(&mut self, event: BlockConnectedEvent) -> Result<()> {
         self.notify(event)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+impl BlockConnectedEventHandle for ServiceRef<BlockConnectorService<MockTxPoolService>>
+{
+    fn handle(&mut self, event: BlockConnectedEvent) -> Result<()> {
+        match event.action {
+            BlockConnectAction::ConnectExecutedBlock | BlockConnectAction::ConnectNewBlock => {
+                println!("jacktest ********* connect to the executed block1");
+                self.notify(event)?;
+                println!("jacktest ********* connect to the executed block2");
+                return Ok(());
+            }
+
+            // _ => {
+            //     println!("jacktest ********* mock apply failed");
+            //     bail!("mock apply failed")
+            // }
+        }
     }
 }
 
@@ -466,6 +488,24 @@ impl BlockConnectedEventHandle for Sender<BlockConnectedEvent> {
 impl BlockConnectedEventHandle for UnboundedSender<BlockConnectedEvent> {
     fn handle(&mut self, event: BlockConnectedEvent) -> Result<()> {
         self.start_send(event)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct BlockConnectEventHandleMock {
+    sender: UnboundedSender<BlockConnectedEvent>,
+}
+
+impl BlockConnectEventHandleMock {
+    pub fn new(sender: UnboundedSender<BlockConnectedEvent>) -> Result<Self> {
+        Ok(Self { sender })
+    }
+}
+
+impl BlockConnectedEventHandle for BlockConnectEventHandleMock {
+    fn handle(&mut self, event: BlockConnectedEvent) -> Result<()> {
+        self.sender.start_send(event)?;
         Ok(())
     }
 }

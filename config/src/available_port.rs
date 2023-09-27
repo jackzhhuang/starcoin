@@ -41,6 +41,7 @@ pub fn get_random_available_port() -> u16 {
             }
         }
     }
+
     panic!("Error: could not find an available port");
 }
 
@@ -57,7 +58,7 @@ fn get_ephemeral_port() -> ::std::io::Result<u16> {
     use std::net::{TcpListener, TcpStream};
 
     // Request a random available port from the OS
-    let listener = TcpListener::bind(("localhost", 0))?;
+    let listener = TcpListener::bind(("127.0.0.1", 0))?;
     let addr = listener.local_addr()?;
 
     // Create and accept a connection (which we'll promptly drop) in order to force the port

@@ -95,15 +95,15 @@ where
     }
 }
 
-impl<P> WriteBlockChainService<P>
+impl<TransactionPoolServiceT> WriteBlockChainService<TransactionPoolServiceT>
 where
-    P: TxPoolSyncService + 'static,
+    TransactionPoolServiceT: TxPoolSyncService + 'static,
 {
     pub fn new(
         config: Arc<NodeConfig>,
         startup_info: StartupInfo,
         storage: Arc<dyn Store>,
-        txpool: P,
+        txpool: TransactionPoolServiceT,
         bus: ServiceRef<BusService>,
         vm_metrics: Option<VMMetrics>,
     ) -> Result<Self> {
@@ -178,8 +178,11 @@ where
     pub fn switch_new_main(
         &mut self,
         new_head_block: HashValue,
-        ctx: &mut ServiceContext<BlockConnectorService>,
-    ) -> Result<()> {
+        ctx: &mut ServiceContext<BlockConnectorService<TransactionPoolServiceT>>,
+    ) -> Result<()>
+    where
+        TransactionPoolServiceT: TxPoolSyncService,
+    {
         let new_branch = BlockChain::new(
             self.config.net().time_service(),
             new_head_block,
@@ -187,13 +190,8 @@ where
             self.vm_metrics.clone(),
         )?;
 
-        let main_total_difficulty = self.main.get_total_difficulty()?;
-        let branch_total_difficulty = new_branch.get_total_difficulty()?;
-        if branch_total_difficulty > main_total_difficulty {
-            self.update_startup_info(new_branch.head_block().header())?;
+        self.select_head(new_branch)?;
 
-            ctx.broadcast(NewHeadBlock(Arc::new(new_branch.head_block())));
-        }
         Ok(())
     }
 
