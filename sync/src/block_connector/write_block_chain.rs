@@ -171,6 +171,18 @@ where
         &self.main
     }
 
+    #[cfg(test)]
+    pub fn apply_failed(&mut self, block: Block) -> Result<()> {
+        use anyhow::bail;
+        use starcoin_chain::verifier::FullVerifier;
+
+        // apply but no connection
+        let verified_block = self.main.verify_with_verifier::<FullVerifier>(block)?;
+        let _executed_block = self.main.execute(verified_block)?;
+
+        bail!("failed to apply for tesing the connection later!");
+    }
+
     // for sync task to connect to its chain, if chain's total difficulties is larger than the main
     // switch by:
     // 1, update the startup info

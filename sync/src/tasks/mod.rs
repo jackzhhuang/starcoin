@@ -419,19 +419,8 @@ impl BlockConnectedEventHandle for ServiceRef<BlockConnectorService<TxPoolServic
 impl BlockConnectedEventHandle for ServiceRef<BlockConnectorService<MockTxPoolService>>
 {
     fn handle(&mut self, event: BlockConnectedEvent) -> Result<()> {
-        match event.action {
-            BlockConnectAction::ConnectExecutedBlock | BlockConnectAction::ConnectNewBlock => {
-                println!("jacktest ********* connect to the executed block1");
-                self.notify(event)?;
-                println!("jacktest ********* connect to the executed block2");
-                return Ok(());
-            }
-
-            // _ => {
-            //     println!("jacktest ********* mock apply failed");
-            //     bail!("mock apply failed")
-            // }
-        }
+        self.notify(event)?;
+        return Ok(());
     }
 }
 

@@ -4,7 +4,7 @@
 use crate::block_connector::{ExecuteRequest, ResetRequest, WriteBlockChainService};
 use crate::sync::{CheckSyncEvent, SyncService};
 use crate::tasks::{BlockConnectedEvent, BlockConnectedFinishEvent, BlockDiskCheckEvent};
-use anyhow::{format_err, Result};
+use anyhow::{format_err, Result, bail};
 use network_api::PeerProvider;
 use starcoin_chain_api::{ConnectBlockError, WriteableChainService, ChainReader};
 use starcoin_config::{NodeConfig, G_CRATE_VERSION};
@@ -238,14 +238,16 @@ impl EventHandler<Self, BlockConnectedEvent>
 
         match msg.action {
             crate::tasks::BlockConnectAction::ConnectNewBlock => {
-                if let Err(e) = self.chain_service.try_connect(block) {
+                if let Err(e) = self.chain_service.apply_failed(block) {
                     error!("Process connected new block from sync error: {:?}", e);
                 }
             }
             crate::tasks::BlockConnectAction::ConnectExecutedBlock => {
+                println!("jacktest **************** swtich new main");
                 if let Err(e) = self.chain_service.switch_new_main(block.header().id(), ctx) {
                     error!("Process connected executed block from sync error: {:?}", e);
                 }
+                println!("jacktest **************** swtich new main ok");
             }
         }
 
@@ -384,10 +386,11 @@ where
         msg: CheckBlockConnectorHashValue,
         _ctx: &mut ServiceContext<BlockConnectorService<TransactionPoolServiceT>>,
     ) -> Result<()> {
-        println!("jacktest************ checking the test head id1");
-        assert_eq!(self.chain_service.get_main().status().head().id(), msg.head_hash);
-        println!("jacktest************ checking the test head id2");
-        Ok(())
+        if self.chain_service.get_main().status().head().id() == msg.head_hash {
+            println!("jacktest ************ pass for connection testing");
+            return Ok(());
+        }
+        bail!("blockchain in chain service is not the same as target!");
     }
 }
 

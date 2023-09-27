@@ -1114,47 +1114,55 @@ fn sync_block_in_block_connection_service_mock(
     Arc::get_mut(&mut target_node)
         .unwrap()
         .produce_block(block_count)?;
-    let target = target_node.sync_target();
+    loop {
+        let target = target_node.sync_target();
 
-    let current_block_header = local_node.chain().current_header();
-    let storage = local_node.chain().get_storage();
+        let storage = local_node.chain().get_storage();
+        let startup_info = storage
+        .get_startup_info()?
+        .ok_or_else(|| format_err!("Startup info should exist."))?;
+        let current_block_id = startup_info.main;
+        println!("jacktest **************** current block id = {}", current_block_id);
 
-    let local_net = local_node.chain_mocker.net();
-    let (local_ancestor_sender, _local_ancestor_receiver) = unbounded();
-    
-    let (sync_task, _task_handle, task_event_counter) = full_sync_task(
-        current_block_header.id(),
-        target.clone(),
-        false,
-        local_net.time_service(),
-        storage.clone(),
-        async_std::task::block_on(registry.service_ref::<BlockConnectorService<MockTxPoolService>>())?.clone(),
-        target_node.clone(),
-        local_ancestor_sender,
-        DummyNetworkService::default(),
-        15,
-        None,
-        None,
-    )?;
-    let branch = async_std::task::block_on(sync_task)?;
-    println!("jacktest **************** now check the branch and current header id == target id");
-    assert_eq!(branch.current_header().id(), target.target_id.id());
+        let local_net = local_node.chain_mocker.net();
+        let (local_ancestor_sender, _local_ancestor_receiver) = unbounded();
+        
+        let (sync_task, _task_handle, task_event_counter) = full_sync_task(
+            current_block_id,
+            target.clone(),
+            false,
+            local_net.time_service(),
+            storage.clone(),
+            async_std::task::block_on(registry.service_ref::<BlockConnectorService<MockTxPoolService>>())?.clone(),
+            target_node.clone(),
+            local_ancestor_sender,
+            DummyNetworkService::default(),
+            15,
+            None,
+            None,
+        )?;
+        let branch = async_std::task::block_on(sync_task)?;
+        assert_eq!(branch.current_header().id(), target.target_id.id());
 
-    let block_connector_service = async_std::task::block_on(registry.service_ref::<BlockConnectorService<MockTxPoolService>>())?.clone();
-    async_std::task::block_on(block_connector_service.send(CheckBlockConnectorHashValue {
-        head_hash: target.target_id.id(),
-    }))??;
-
-    let reports = task_event_counter.get_reports();
-    reports
-        .iter()
-        .for_each(|report| debug!("reports: {}", report));
+        let block_connector_service = async_std::task::block_on(registry.service_ref::<BlockConnectorService<MockTxPoolService>>())?.clone();
+        let result = async_std::task::block_on(block_connector_service.send(CheckBlockConnectorHashValue {
+            head_hash: target.target_id.id(),
+        }))?;
+        if result.is_ok() {
+            println!("jacktest ************* result.is_ok()");
+            break;
+        }
+        let reports = task_event_counter.get_reports();
+        reports
+            .iter()
+            .for_each(|report| debug!("reports: {}", report));
+    }
 
     Ok(target_node)
 }
 
 #[stest::test]
-async fn test_sync_chain_service_mock() -> Result<()> {
+async fn test_sync_block_apply_failed_but_connect_success() -> Result<()> {
     let config = Arc::new(NodeConfig::random_for_test());
     let (storage, chain_info, _) = StarcoinGenesis::init_storage_for_test(config.net())
         .expect("init storage by genesis fail.");
@@ -1187,8 +1195,6 @@ async fn test_sync_chain_service_mock() -> Result<()> {
             registry.put_shared(storage.clone()).await.unwrap();
             registry.put_shared(MockTxPoolService::new()).await.unwrap();
 
-            // let _txpool_service = registry.register::<TxPoolActorService>().await.unwrap();
-
             Delay::new(Duration::from_secs(2)).await;
 
             registry
@@ -1205,8 +1211,6 @@ async fn test_sync_chain_service_mock() -> Result<()> {
     let registry = registry_receiver.recv().await.unwrap();
 
     _ = sync_block_in_block_connection_service_mock(target_node, local_node.clone(), &registry, 5)?;
-
-    println!("jacktest ************ now the testing system is being shutdowned");
 
     Ok(())
 }

@@ -73,7 +73,6 @@ where
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        println!("jacktest ********** {} is started", S::service_name());
         ctx.set_mailbox_capacity(DEFAULT_MAIL_BOX_CAP);
         let mut service_ctx = ServiceContext::new(&mut self.cache, ctx);
         if let Err(e) = self.proxy.start(&mut service_ctx) {
@@ -85,7 +84,6 @@ where
     }
 
     fn stopped(&mut self, ctx: &mut Self::Context) {
-        println!("jacktest ********** {} is stop22", S::service_name());
         let mut service_ctx = ServiceContext::new(&mut self.cache, ctx);
         if let Err(e) = self.proxy.stop(&mut service_ctx) {
             error!("{} service stop fail: {:?}.", S::service_name(), e);
@@ -257,7 +255,6 @@ where
     fn handle(&mut self, msg: EventMessage<M>, ctx: &mut Self::Context) -> Self::Result {
         debug!("{} handle event: {:?}", S::service_name(), &msg.msg);
         if self.proxy.status().is_stopped() {
-            println!("jacktest ********** {} is stop", S::service_name());
             info!("Service {} is already stopped", S::service_name());
             return;
         }
