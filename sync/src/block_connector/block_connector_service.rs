@@ -243,11 +243,9 @@ impl EventHandler<Self, BlockConnectedEvent>
                 }
             }
             crate::tasks::BlockConnectAction::ConnectExecutedBlock => {
-                println!("jacktest **************** swtich new main");
                 if let Err(e) = self.chain_service.switch_new_main(block.header().id(), ctx) {
                     error!("Process connected executed block from sync error: {:?}", e);
                 }
-                println!("jacktest **************** swtich new main ok");
             }
         }
 
@@ -387,9 +385,10 @@ where
         _ctx: &mut ServiceContext<BlockConnectorService<TransactionPoolServiceT>>,
     ) -> Result<()> {
         if self.chain_service.get_main().status().head().id() == msg.head_hash {
-            println!("jacktest ************ pass for connection testing");
+            info!("the branch in chain service is the same as target's branch");
             return Ok(());
         }
+        info!("mock branch in chain service is not the same as target's branch");
         bail!("blockchain in chain service is not the same as target!");
     }
 }

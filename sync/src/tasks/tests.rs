@@ -1122,7 +1122,6 @@ fn sync_block_in_block_connection_service_mock(
         .get_startup_info()?
         .ok_or_else(|| format_err!("Startup info should exist."))?;
         let current_block_id = startup_info.main;
-        println!("jacktest **************** current block id = {}", current_block_id);
 
         let local_net = local_node.chain_mocker.net();
         let (local_ancestor_sender, _local_ancestor_receiver) = unbounded();
@@ -1142,6 +1141,7 @@ fn sync_block_in_block_connection_service_mock(
             None,
         )?;
         let branch = async_std::task::block_on(sync_task)?;
+        info!("checking branch in sync service is the same as target's branch");
         assert_eq!(branch.current_header().id(), target.target_id.id());
 
         let block_connector_service = async_std::task::block_on(registry.service_ref::<BlockConnectorService<MockTxPoolService>>())?.clone();
@@ -1149,7 +1149,6 @@ fn sync_block_in_block_connection_service_mock(
             head_hash: target.target_id.id(),
         }))?;
         if result.is_ok() {
-            println!("jacktest ************* result.is_ok()");
             break;
         }
         let reports = task_event_counter.get_reports();
@@ -1179,7 +1178,7 @@ async fn test_sync_block_apply_failed_but_connect_success() -> Result<()> {
 
     let (registry_sender, registry_receiver) = async_std::channel::unbounded();
 
-    let handle = timeout_join_handler::spawn(move|| {
+    let _handle = timeout_join_handler::spawn(move|| {
         let system = System::with_tokio_rt(|| {
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
@@ -1210,7 +1209,8 @@ async fn test_sync_block_apply_failed_but_connect_success() -> Result<()> {
 
     let registry = registry_receiver.recv().await.unwrap();
 
-    _ = sync_block_in_block_connection_service_mock(target_node, local_node.clone(), &registry, 5)?;
+    let target_node = sync_block_in_block_connection_service_mock(target_node, local_node.clone(), &registry, 10)?;
+    _ = sync_block_in_block_connection_service_mock(target_node, local_node.clone(), &registry, 20)?;
 
     Ok(())
 }
