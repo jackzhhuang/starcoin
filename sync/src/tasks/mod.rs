@@ -39,7 +39,7 @@ use stream_task::{
 };
 
 pub trait SyncFetcher: PeerOperator + BlockIdFetcher + BlockFetcher + BlockInfoFetcher {
-    fn get_dag_targets(&self, total_difficulty: U256, local_dag_accumulator_leaf_num: u64) -> Result<Vec<AccumulatorInfo>> {
+    fn get_dag_targets(&self, total_difficulty: U256, local_dag_accumulator_leaf_num: u64) -> Result<Vec<(PeerId, AccumulatorInfo)>> {
         Ok(self
             .peer_selector()
             .peer_infos()
@@ -49,7 +49,7 @@ pub trait SyncFetcher: PeerOperator + BlockIdFetcher + BlockFetcher + BlockInfoF
                     (Some(info), Some(k)) => {
                         k.first() <= total_difficulty || info.get_num_leaves() > local_dag_accumulator_leaf_num
                     }
-                    (NOne, None) => false,
+                    (None, None) => false,
                     _ => {
                         warn!("dag accumulator is inconsistent with k total difficulty");
                         false
@@ -57,7 +57,7 @@ pub trait SyncFetcher: PeerOperator + BlockIdFetcher + BlockFetcher + BlockInfoF
                 } 
             })
             .map(|peer_info| {
-                peer_info.chain_info().dag_accumulator_info().clone()
+                (peer_info.peer_id, peer_info.chain_info().dag_accumulator_info().clone())
             })
             .collect());
     }

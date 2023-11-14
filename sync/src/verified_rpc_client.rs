@@ -146,6 +146,11 @@ impl VerifiedRpcClient {
             .ok_or_else(|| format_err!("No peers for send request."))
     }
 
+
+    pub fn switch_strategy(&mut self, strategy: PeerStrategy) {
+        self.peer_selector.switch_strategy(strategy);
+    }
+
     pub async fn get_txns_with_hash_from_pool(
         &self,
         peer_id: Option<PeerId>,

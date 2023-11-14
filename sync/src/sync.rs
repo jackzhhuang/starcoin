@@ -6,6 +6,7 @@ use crate::sync_metrics::SyncMetrics;
 use crate::tasks::{full_sync_task, sync_dag_full_task, AncestorEvent, SyncFetcher};
 use crate::verified_rpc_client::{RpcVerifyError, VerifiedRpcClient};
 use anyhow::{format_err, Ok, Result};
+use forkable_jellyfish_merkle::node_type::Node;
 use futures::executor::block_on;
 use futures::FutureExt;
 use futures_timer::Delay;
@@ -125,6 +126,73 @@ impl SyncService {
         })
     }
 
+     pub async fn create_verified_client(
+        &self,
+        network: NetworkServiceRef,
+        config: Arc<NodeConfig>,
+        peer_strategy: Option<PeerStrategy>,
+        peers: Vec<PeerId>,
+    ) -> Result<Arc<VerifiedRpcClient>> {
+        let peer_select_strategy =
+            peer_strategy.unwrap_or_else(|| config.sync.peer_select_strategy());
+
+        let mut peer_set = network.peer_set().await?;
+
+        loop {
+            if peer_set.is_empty() || peer_set.len() < (config.net().min_peers() as usize) {
+                let level = if config.net().is_dev() || config.net().is_test() {
+                    Level::Debug
+                } else {
+                    Level::Info
+                };
+                log!(
+                    level,
+                    "[sync]Waiting enough peers to sync, current: {:?} peers, min peers: {:?}",
+                    peer_set.len(),
+                    config.net().min_peers()
+                );
+
+                Delay::new(Duration::from_secs(1)).await;
+                peer_set = network.peer_set().await?;
+            } else {
+                break;
+            }
+        }
+
+        let peer_reputations = network
+            .reputations(REPUTATION_THRESHOLD)
+            .await?
+            .await?
+            .into_iter()
+            .map(|(peer, reputation)| {
+                (
+                    peer,
+                    (REPUTATION_THRESHOLD.abs().saturating_add(reputation)) as u64,
+                )
+            })
+            .collect();
+
+        let peer_selector = PeerSelector::new_with_reputation(
+            peer_reputations,
+            peer_set,
+            peer_select_strategy,
+            peer_score_metrics,
+        );
+
+        peer_selector.retain_rpc_peers();
+        if !peers.is_empty() {
+            peer_selector.retain(peers.as_ref())
+        }
+        if peer_selector.is_empty() {
+            return Err(format_err!("[sync] No peers to sync."));
+        }
+
+        Ok(Arc::new(VerifiedRpcClient::new(
+            peer_selector.clone(),
+            network.clone(),
+        )))
+    }
+
     pub fn check_and_start_sync(
         &mut self,
         peers: Vec<PeerId>,
@@ -190,63 +258,8 @@ impl SyncService {
             .expect("storage must exist")
             .get_accumulator_snapshot_storage();
 
-        let dag = ctx.get_shared::<Arc<Mutex<BlockDAG>>>()?;
-
-        let test_storage = storage.clone();
         let fut = async move {
-            let peer_select_strategy =
-                peer_strategy.unwrap_or_else(|| config.sync.peer_select_strategy());
-
-            let mut peer_set = network.peer_set().await?;
-
-            loop {
-                if peer_set.is_empty() || peer_set.len() < (config.net().min_peers() as usize) {
-                    let level = if config.net().is_dev() || config.net().is_test() {
-                        Level::Debug
-                    } else {
-                        Level::Info
-                    };
-                    log!(
-                        level,
-                        "[sync]Waiting enough peers to sync, current: {:?} peers, min peers: {:?}",
-                        peer_set.len(),
-                        config.net().min_peers()
-                    );
-
-                    Delay::new(Duration::from_secs(1)).await;
-                    peer_set = network.peer_set().await?;
-                } else {
-                    break;
-                }
-            }
-
-            let peer_reputations = network
-                .reputations(REPUTATION_THRESHOLD)
-                .await?
-                .await?
-                .into_iter()
-                .map(|(peer, reputation)| {
-                    (
-                        peer,
-                        (REPUTATION_THRESHOLD.abs().saturating_add(reputation)) as u64,
-                    )
-                })
-                .collect();
-
-            let peer_selector = PeerSelector::new_with_reputation(
-                peer_reputations,
-                peer_set,
-                peer_select_strategy,
-                peer_score_metrics,
-            );
-
-            peer_selector.retain_rpc_peers();
-            if !peers.is_empty() {
-                peer_selector.retain(peers.as_ref())
-            }
-            if peer_selector.is_empty() {
-                return Err(format_err!("[sync] No peers to sync."));
-            }
+            let rpc_client = self.create_verified_client(network.clone(), config.clone(), peer_strategy, peers).await?;
 
             let startup_info = storage
                 .get_startup_info()?
@@ -257,10 +270,6 @@ impl SyncService {
                     format_err!("Can not find block info by id: {}", current_block_id)
                 })?;
 
-            let rpc_client = Arc::new(VerifiedRpcClient::new(
-                peer_selector.clone(),
-                network.clone(),
-            ));
 
             let op_local_dag_accumulator_info =
                 self.flexidag_service.send(GetDagAccumulatorInfo).await??;
@@ -269,7 +278,8 @@ impl SyncService {
                 let dag_sync_futs = rpc_client
                     .get_dag_targets(current_block_info.get_total_difficulty(), local_dag_accumulator_info.get_num_leaves())?
                     .into_iter()
-                    .fold(Ok(vec![]), |mut futs, target_accumulator_infos| {
+                    .fold(Ok(vec![]), |mut futs, (peer_id, target_accumulator_infos)| {
+                        rpc_client.switch_strategy(PeerStrategy::DagSync(peer_id));
                         let (fut, task_handle, task_event_handle) = sync_dag_full_task(
                             local_dag_accumulator_info,
                             target_accumulator_info,

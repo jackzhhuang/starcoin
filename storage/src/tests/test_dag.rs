@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use starcoin_accumulator::{accumulator_info::AccumulatorInfo, Accumulator, MerkleAccumulator};
 use starcoin_config::RocksdbConfig;
 use starcoin_crypto::HashValue;
@@ -52,7 +54,7 @@ impl SyncFlexiDagManagerImp {
     }
 }
 
-// todo: fix this 
+// jacktest todo: fix this 
 impl SyncFlexiDagManager for SyncFlexiDagManagerImp {
     fn insert_hashes(&self, mut child_hashes: Vec<HashValue>) -> Result<HashValue> {
         child_hashes.sort();
@@ -63,7 +65,7 @@ impl SyncFlexiDagManager for SyncFlexiDagManagerImp {
             SyncFlexiDagSnapshot {
                 child_hashes,
                 accumulator_info: self.get_accumulator_info(),
-                k_total_difficulties: None,
+                k_total_difficulties: BTreeSet::new(),
                 head_block_id: accumulator_key,
             },
         )?;

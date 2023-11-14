@@ -170,12 +170,6 @@ fn get_start_block_id(
         .clone())
 }
 
-async fn sync_dag_block2(
-    start_index: u64,
-    accumulator: MerkleAccumulator,
-) -> anyhow::Result<BlockChain> {
-}
-
 async fn sync_dag_block<H, N>(
     start_index: u64,
     accumulator: MerkleAccumulator,
