@@ -7,6 +7,7 @@ use crate::genesis_config::{ChainId, ConsensusStrategy};
 use crate::language_storage::CORE_CODE_ADDRESS;
 use crate::transaction::SignedUserTransaction;
 use crate::U256;
+use anyhow::format_err;
 use bcs_ext::{BCSCodec, Sample};
 use schemars::{self, JsonSchema};
 use serde::de::Error;
@@ -25,6 +26,8 @@ use std::hash::Hash;
 /// Type for block number.
 pub type BlockNumber = u64;
 
+//TODO: make sure height
+pub const DAG_FORK_HEIGHT: u64 = 100000;
 pub type ParentsHash = Option<Vec<HashValue>>;
 
 /// Type for block header extra
@@ -313,6 +316,10 @@ impl BlockHeader {
         &self.extra
     }
 
+    pub fn is_dag(&self) -> bool {
+        self.number > DAG_FORK_HEIGHT
+    }
+
     pub fn is_genesis(&self) -> bool {
         self.number == 0
     }
@@ -361,6 +368,21 @@ impl BlockHeader {
             BlockHeaderExtra([0u8; 4]),
             None,
         )
+    }
+
+    //for test
+    pub fn dag_genesis_random() -> Self {
+        let mut header = Self::random();
+        header.parents_hash = Some(vec![header.parent_hash]);
+        header.number = DAG_FORK_HEIGHT;
+        header
+    }
+    pub fn set_parents(&mut self, parents: Vec<HashValue>) {
+        self.parents_hash = Some(parents);
+    }
+
+    pub fn is_dag_genesis(&self) -> bool {
+        self.number == DAG_FORK_HEIGHT
     }
 
     pub fn as_builder(&self) -> BlockHeaderBuilder {
@@ -688,6 +710,20 @@ impl Block {
         }
     }
 
+    pub fn is_dag(&self) -> bool {
+        self.header.is_dag()
+    }
+
+    pub fn parent_hash(&self) -> anyhow::Result<HashValue> {
+        if self.is_dag() {
+            self.dag_parent_and_tips()
+                .map(|dag| dag.0.id())
+                .ok_or_else(|| format_err!("missing parent and tips for dag block"))
+        } else {
+            Ok(self.header().parent_hash())
+        }
+    }
+
     pub fn id(&self) -> HashValue {
         self.header.id()
     }
@@ -709,6 +745,13 @@ impl Block {
         self.uncles()
             .map(|uncles| uncles.iter().map(|header| header.id()).collect())
             .unwrap_or_default()
+    }
+
+    fn dag_parent_and_tips(&self) -> Option<(&BlockHeader, &[BlockHeader])> {
+        self.body
+            .uncles
+            .as_ref()
+            .and_then(|uncles| uncles.split_first())
     }
 
     pub fn into_inner(self) -> (BlockHeader, BlockBody) {
@@ -844,8 +887,6 @@ impl BlockInfo {
     pub fn block_id(&self) -> &HashValue {
         &self.block_id
     }
-
-
 }
 
 impl Sample for BlockInfo {

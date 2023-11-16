@@ -51,11 +51,7 @@ pub struct CompactBlockMessage {
 }
 
 impl CompactBlockMessage {
-    pub fn new(
-        compact_block: CompactBlock,
-        block_info: BlockInfo,
-        tips_hash: Option<Vec<HashValue>>,
-    ) -> Self {
+    pub fn new(compact_block: CompactBlock, block_info: BlockInfo) -> Self {
         Self {
             compact_block,
             block_info,
@@ -65,7 +61,7 @@ impl CompactBlockMessage {
 
 impl Sample for CompactBlockMessage {
     fn sample() -> Self {
-        Self::new(CompactBlock::sample(), BlockInfo::sample(), None)
+        Self::new(CompactBlock::sample(), BlockInfo::sample())
     }
 }
 

@@ -10,7 +10,7 @@ use starcoin_chain::BlockChain;
 use starcoin_chain::{ChainReader, ChainWriter};
 use starcoin_config::ChainNetwork;
 use starcoin_config::NodeConfig;
-use starcoin_consensus::Consensus;
+use starcoin_consensus::{BlockDAG, Consensus};
 use starcoin_crypto::hash::HashValue;
 use starcoin_executor::VMMetrics;
 use starcoin_flexidag::flexidag_service::GetDagTips;
@@ -318,14 +318,33 @@ where
         // block_gas_limit / min_gas_per_txn
         let max_txns = (block_gas_limit / 200) * 2;
 
-        let txns = self.tx_provider.get_txns(max_txns);
+        let mut txns = self.tx_provider.get_txns(max_txns);
 
         let author = *self.miner_account.address();
         let previous_header = self.chain.current_header();
 
-        let dag_block_parents = self.get_dag_block_parents();
+        let tips_hash = self.chain.status().tips_hash;
+        let uncles = {
+            match &tips_hash {
+                None => self.find_uncles(),
+                Some(tips) => {
+                    let mut blues = self.dag.ghostdata(tips).mergeset_blues.to_vec();
+                    let mut blues_header = vec![];
+                    let selected_parent = blues.remove(0);
+                    assert_eq!(previous_header.id(), selected_parent);
+                    for blue in &blues {
+                        let block = self
+                            .storage
+                            .get_block_by_hash(blue.to_owned())?
+                            .expect("Block should exist");
+                        txns.extend(block.transactions().iter().cloned());
+                        blues_header.push(block.header);
+                    }
+                    blues_header
+                }
+            }
+        };
 
-        let uncles = self.find_uncles();
         let mut now_millis = self.chain.time_service().now_millis();
         if now_millis <= previous_header.timestamp() {
             info!(
@@ -358,7 +377,7 @@ where
             difficulty,
             strategy,
             self.vm_metrics.clone(),
-            tips_header,
+            tips_hash,
         )?;
         let excluded_txns = opened_block.push_txns(txns)?;
         let template = opened_block.finalize()?;
@@ -370,11 +389,5 @@ where
             parent: previous_header,
             template,
         })
-    }
-
-    fn get_dag_block_parents(&self) -> Result<Option<Vec<HashValue>>> {
-        Ok(async_std::task::block_on(
-            self.flexidag_service.send(GetDagTips),
-        )??)
     }
 }

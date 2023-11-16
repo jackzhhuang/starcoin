@@ -263,7 +263,7 @@ where
     TransactionPoolServiceT: TxPoolSyncService + 'static,
 {
     fn handle_event(&mut self, msg: MinedBlock, ctx: &mut ServiceContext<Self>) {
-        let MinedBlock(new_block, tips_headers) = msg;
+        let MinedBlock(new_block) = msg;
         let block_header = new_block.header().clone();
         let id = new_block.header().id();
         debug!("try connect mined block: {}", id);
@@ -384,7 +384,7 @@ where
         msg: ExecuteRequest,
         _ctx: &mut ServiceContext<BlockConnectorService<TransactionPoolServiceT>>,
     ) -> Result<ExecutedBlock> {
-        self.chain_service.execute(msg.block, msg.block_parent)
+        self.chain_service.execute(msg.block)
     }
 }
 

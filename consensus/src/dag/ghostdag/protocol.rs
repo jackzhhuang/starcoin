@@ -3,9 +3,9 @@ use crate::consensusdb::schemadb::{GhostdagStoreReader, HeaderStoreReader, Relat
 use crate::dag::reachability::reachability_service::ReachabilityService;
 use crate::dag::types::{ghostdata::GhostdagData, ordering::*};
 use starcoin_crypto::HashValue as Hash;
-use starcoin_types::blockhash::{
-    self, BlockHashExtensions, BlockHashMap, BlockHashes, BlueWorkType, HashKTypeMap, KType,
-};
+use starcoin_types::block::BlockHeader;
+use starcoin_types::blockhash::{BlockHashMap, BlockHashes, BlueWorkType, HashKTypeMap, KType};
+use starcoin_types::U256;
 use std::sync::Arc;
 // For GhostdagStoreReader-related functions, use GhostDagDataWrapper instead.
 //  ascending_mergeset_without_selected_parent
@@ -21,7 +21,6 @@ pub struct GhostdagManager<
     U: ReachabilityService,
     V: HeaderStoreReader,
 > {
-    genesis_hash: Hash,
     pub(super) k: KType,
     pub(super) ghostdag_store: T,
     pub(super) relations_store: S,
@@ -37,7 +36,6 @@ impl<
     > GhostdagManager<T, S, U, V>
 {
     pub fn new(
-        genesis_hash: Hash,
         k: KType,
         ghostdag_store: T,
         relations_store: S,
@@ -45,7 +43,6 @@ impl<
         reachability_service: U,
     ) -> Self {
         Self {
-            genesis_hash,
             k,
             ghostdag_store,
             relations_store,
@@ -54,11 +51,11 @@ impl<
         }
     }
 
-    pub fn genesis_ghostdag_data(&self) -> GhostdagData {
+    pub fn genesis_ghostdag_data(&self, genesis: &BlockHeader) -> GhostdagData {
         GhostdagData::new(
             0,
-            Default::default(), // TODO: take blue score and work from actual genesis
-            Hash::new(blockhash::ORIGIN),
+            Default::default(), //todo:: difficulty
+            genesis.parent_hash(),
             BlockHashes::new(Vec::new()),
             BlockHashes::new(Vec::new()),
             HashKTypeMap::new(BlockHashMap::new()),
@@ -142,15 +139,7 @@ impl<
             .mergeset_blues
             .iter()
             .cloned()
-            .map(|hash| {
-                if hash.is_origin() {
-                    0u128
-                } else {
-                    //TODO: implement caculate pow work
-                    let _difficulty = self.headers_store.get_difficulty(hash).unwrap();
-                    1024u128
-                }
-            })
+            .map(|hash| self.headers_store.get_difficulty(hash).unwrap_or(0.into()))
             .sum();
 
         let blue_work = self
@@ -235,13 +224,13 @@ impl<
             if let Some(size) = current_blues_anticone_sizes.get(&block) {
                 return *size;
             }
-
+            /* TODO: consider refactor it
             if current_selected_parent == self.genesis_hash
                 || current_selected_parent == Hash::new(blockhash::ORIGIN)
             {
                 panic!("block {block} is not in blue set of the given context");
             }
-
+            */
             current_blues_anticone_sizes = self
                 .ghostdag_store
                 .get_blues_anticone_sizes(current_selected_parent)
@@ -290,7 +279,7 @@ impl<
                     return ColoringOutput::Blue(
                         candidate_blue_anticone_size,
                         candidate_blues_anticone_sizes,
-                    )
+                    );
                 }
                 ColoringState::Red => return ColoringOutput::Red,
                 ColoringState::Pending => (), // continue looping
@@ -319,7 +308,8 @@ impl<
 
 /// Chain block with attached ghostdag data
 struct ChainBlock<'a> {
-    hash: Option<Hash>, // if set to `None`, signals being the new block
+    hash: Option<Hash>,
+    // if set to `None`, signals being the new block
     data: Refs<'a, GhostdagData>,
 }
 
@@ -333,6 +323,7 @@ enum ColoringState {
 #[derive(Debug)]
 /// Represents the final output of GHOSTDAG coloring for the current candidate
 pub enum ColoringOutput {
-    Blue(KType, BlockHashMap<KType>), // (blue anticone size, map of blue anticone sizes for each affected blue)
+    Blue(KType, BlockHashMap<KType>),
+    // (blue anticone size, map of blue anticone sizes for each affected blue)
     Red,
 }

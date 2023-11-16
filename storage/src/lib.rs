@@ -27,11 +27,9 @@ use starcoin_accumulator::{
 };
 use starcoin_config::ChainNetworkID;
 use starcoin_crypto::HashValue;
-use starcoin_logger::prelude::info;
 use starcoin_state_store_api::{StateNode, StateNodeStore};
 use starcoin_types::{
-    block::{Block, BlockBody, BlockHeader, BlockInfo, BlockNumber},
-    blockhash::ORIGIN,
+    block::{Block, BlockBody, BlockHeader, BlockInfo},
     contract_event::ContractEvent,
     dag_block::KTotalDifficulty,
     header,
@@ -40,7 +38,6 @@ use starcoin_types::{
 };
 use starcoin_vm_types::{
     account_address::AccountAddress,
-    dag_block_metadata,
     state_store::table::{TableHandle, TableInfo},
 };
 use std::{

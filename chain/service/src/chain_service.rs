@@ -357,54 +357,15 @@ impl ReadableChainService for ChainReaderServiceInner {
         self.storage.get_block_by_hash(hash)
     }
 
-    fn get_blocks(
-        &self,
-        ids: Vec<HashValue>,
-    ) -> Result<Vec<Option<(Block, Option<Vec<HashValue>>, Option<HashValue>)>>> {
-        let blocks = self.storage.get_blocks(ids)?;
-        Ok(blocks
-            .into_iter()
-            .map(|block| {
-                if let Some(block) = block {
-                    let result_parents =
-                        async_std::task::block_on(self.flexidag_service.send(GetDagBlockParents {
-                            block_id: block.id(),
-                        }))
-                        .expect("failed to get the dag block parents");
-                    let parents = match result_parents {
-                        std::result::Result::Ok(parents) => parents.parents,
-                        Err(_) => panic!("failed to get parents of block {}", block.id()),
-                    };
-                    let transaction_parent = match self.storage.get_block_info(block.id()) {
-                        std::result::Result::Ok(block_info) => {
-                            if let Some(block_info) = &block_info {
-                                let block_accumulator = MerkleAccumulator::new_with_info(
-                                    block_info.block_accumulator_info.clone(),
-                                    self.storage
-                                        .get_accumulator_store(AccumulatorStoreType::Block),
-                                );
-                                block_accumulator
-                                    .get_leaf(block_info.block_accumulator_info.num_leaves - 2)
-                                    .expect("block should have transction header")
-                            } else {
-                                None
-                            }
-                        }
-                        Err(_) => todo!(),
-                    };
-                    Some((block, Some(parents), transaction_parent))
-                } else {
-                    None
-                }
-            })
-            .collect())
+    fn get_blocks(&self, ids: Vec<HashValue>) -> Result<Vec<Option<Block>>> {
+        self.storage.get_blocks(ids)
     }
 
     fn get_headers(&self, ids: Vec<HashValue>) -> Result<Vec<Option<BlockHeader>>> {
         Ok(self
             .get_blocks(ids)?
             .into_iter()
-            .map(|block| block.map(|b| b.0.header))
+            .map(|block| block.map(|b| b.header))
             .collect())
     }
 

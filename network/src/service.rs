@@ -484,7 +484,7 @@ impl Inner {
     }
 
     pub(crate) fn update_chain_status(&mut self, sync_status: SyncStatus) {
-        let chain_status: ChainStatus = sync_status.chain_status().clone();
+        let chain_status = sync_status.chain_status().clone();
         self.self_peer
             .peer_info
             .update_chain_status(chain_status.clone());

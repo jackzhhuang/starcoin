@@ -146,11 +146,6 @@ impl VerifiedRpcClient {
             .ok_or_else(|| format_err!("No peers for send request."))
     }
 
-
-    pub fn switch_strategy(&mut self, strategy: PeerStrategy) {
-        self.peer_selector.switch_strategy(strategy);
-    }
-
     pub async fn get_txns_with_hash_from_pool(
         &self,
         peer_id: Option<PeerId>,
@@ -386,7 +381,16 @@ impl VerifiedRpcClient {
     pub async fn get_blocks(
         &self,
         ids: Vec<HashValue>,
-    ) -> Result<Vec<Option<(Block, Option<PeerId>)>>> {
+    ) -> Result<
+        Vec<
+            Option<(
+                Block,
+                Option<PeerId>,
+                Option<Vec<HashValue>>,
+                Option<HashValue>,
+            )>,
+        >,
+    > {
         let peer_id = self.select_a_peer()?;
         let start_time = Instant::now();
         let blocks = self.client.get_blocks(peer_id.clone(), ids.clone()).await?;
@@ -408,7 +412,7 @@ impl VerifiedRpcClient {
                         );
                         None
                     } else {
-                        Some((block.0, Some(peer_id.clone())))
+                        Some((block.0, Some(peer_id.clone()), block.1, block.2))
                     }
                 } else {
                     None

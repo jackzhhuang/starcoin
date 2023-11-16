@@ -135,7 +135,7 @@ impl MockChain {
     }
 
     pub fn apply(&mut self, block: Block) -> Result<()> {
-        self.head.apply(block, None)?;
+        self.head.apply(block)?;
         Ok(())
     }
 

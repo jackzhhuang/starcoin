@@ -21,7 +21,7 @@ pub trait RelationsStoreReader {
 /// non-append-only and thus needs to be guarded.
 pub trait RelationsStore: RelationsStoreReader {
     /// Inserts `parents` into a new store entry for `hash`, and for each `parent ∈ parents` adds `hash` to `parent.children`
-    fn insert(&mut self, hash: Hash, parents: BlockHashes) -> Result<(), StoreError>;
+    fn insert(&self, hash: Hash, parents: BlockHashes) -> Result<(), StoreError>;
 }
 
 pub(crate) const PARENTS_CF: &str = "block-parents";
@@ -78,7 +78,7 @@ pub struct DbRelationsStore {
 }
 
 impl DbRelationsStore {
-    pub fn new(db: Arc<DBStorage>, level: BlockLevel, cache_size: u64) -> Self {
+    pub fn new(db: Arc<DBStorage>, level: BlockLevel, cache_size: usize) -> Self {
         Self {
             db: Arc::clone(&db),
             level,
@@ -87,7 +87,7 @@ impl DbRelationsStore {
         }
     }
 
-    pub fn clone_with_new_cache(&self, cache_size: u64) -> Self {
+    pub fn clone_with_new_cache(&self, cache_size: usize) -> Self {
         Self::new(Arc::clone(&self.db), self.level, cache_size)
     }
 
@@ -149,7 +149,7 @@ impl RelationsStoreReader for DbRelationsStore {
 impl RelationsStore for DbRelationsStore {
     /// See `insert_batch` as well
     /// TODO: use one function with DbWriter for both this function and insert_batch
-    fn insert(&mut self, hash: Hash, parents: BlockHashes) -> Result<(), StoreError> {
+    fn insert(&self, hash: Hash, parents: BlockHashes) -> Result<(), StoreError> {
         if self.has(hash)? {
             return Err(StoreError::KeyAlreadyExists(hash.to_string()));
         }
@@ -180,91 +180,15 @@ impl RelationsStore for DbRelationsStore {
     }
 }
 
-pub struct MemoryRelationsStore {
-    parents_map: BlockHashMap<BlockHashes>,
-    children_map: BlockHashMap<BlockHashes>,
-}
-
-impl MemoryRelationsStore {
-    pub fn new() -> Self {
-        Self {
-            parents_map: BlockHashMap::new(),
-            children_map: BlockHashMap::new(),
-        }
-    }
-}
-
-impl Default for MemoryRelationsStore {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl RelationsStoreReader for MemoryRelationsStore {
-    fn get_parents(&self, hash: Hash) -> Result<BlockHashes, StoreError> {
-        match self.parents_map.get(&hash) {
-            Some(parents) => Ok(BlockHashes::clone(parents)),
-            None => Err(StoreError::KeyNotFound(hash.to_string())),
-        }
-    }
-
-    fn get_children(&self, hash: Hash) -> Result<BlockHashes, StoreError> {
-        match self.children_map.get(&hash) {
-            Some(children) => Ok(BlockHashes::clone(children)),
-            None => Err(StoreError::KeyNotFound(hash.to_string())),
-        }
-    }
-
-    fn has(&self, hash: Hash) -> Result<bool, StoreError> {
-        Ok(self.parents_map.contains_key(&hash))
-    }
-}
-
-impl RelationsStore for MemoryRelationsStore {
-    fn insert(&mut self, hash: Hash, parents: BlockHashes) -> Result<(), StoreError> {
-        if let Vacant(e) = self.parents_map.entry(hash) {
-            // Update the new entry for `hash`
-            e.insert(BlockHashes::clone(&parents));
-
-            // Update `children` for each parent
-            for parent in parents.iter().cloned() {
-                let mut children = (*self.get_children(parent)?).clone();
-                children.push(hash);
-                self.children_map.insert(parent, BlockHashes::new(children));
-            }
-
-            // The new hash has no children yet
-            self.children_map.insert(hash, BlockHashes::new(Vec::new()));
-            Ok(())
-        } else {
-            Err(StoreError::KeyAlreadyExists(hash.to_string()))
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consensusdb::{
-        db::RelationsStoreConfig,
-        prelude::{FlexiDagStorage, FlexiDagStorageConfig},
-    };
-
-    #[test]
-    fn test_memory_relations_store() {
-        test_relations_store(MemoryRelationsStore::new());
-    }
+    use crate::consensusdb::prelude::{FlexiDagStorage, FlexiDagStorageConfig};
 
     #[test]
     fn test_db_relations_store() {
         let db_tempdir = tempfile::tempdir().unwrap();
-        let rs_conf = RelationsStoreConfig {
-            block_level: 0,
-            cache_size: 2,
-        };
-        let config = FlexiDagStorageConfig::new()
-            .update_parallelism(1)
-            .update_relations_conf(rs_conf);
+        let config = FlexiDagStorageConfig::new();
 
         let db = FlexiDagStorage::create_from_path(db_tempdir.path(), config)
             .expect("failed to create flexidag storage");

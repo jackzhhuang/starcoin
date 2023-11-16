@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeSet, BinaryHeap},
+    collections::BTreeSet,
     sync::Arc,
 };
 
@@ -15,7 +15,6 @@ use serde::{Deserialize, Serialize};
 use starcoin_accumulator::accumulator_info::AccumulatorInfo;
 use starcoin_crypto::HashValue;
 use starcoin_types::dag_block::KTotalDifficulty;
-use starcoin_uint::U256;
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SyncFlexiDagSnapshot {

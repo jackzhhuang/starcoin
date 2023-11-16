@@ -44,7 +44,6 @@ use starcoin_types::{
 };
 use starcoin_vm_types::access_path::AccessPath;
 use starcoin_vm_types::account_config::genesis_address;
-use starcoin_vm_types::effects::Op;
 use starcoin_vm_types::genesis_config::ConsensusStrategy;
 use starcoin_vm_types::on_chain_resource::Epoch;
 use std::cmp::min;
@@ -69,7 +68,6 @@ pub struct BlockChain {
     uncles: HashMap<HashValue, MintedUncleNumber>,
     epoch: Epoch,
     vm_metrics: Option<VMMetrics>,
-    // dag_accumulator: Option<MerkleAccumulator>,
     net: ChainNetworkID,
 }
 
@@ -323,7 +321,6 @@ impl BlockChain {
             difficulty,
             strategy,
             None,
-            // jacktest: TODO: this create single chian block not a dag block
             None,
         )?;
         let excluded_txns = opened_block.push_txns(user_txns)?;
@@ -393,7 +390,7 @@ impl BlockChain {
     {
         let verified_block = self.verify_with_verifier::<V>(block)?;
         watch(CHAIN_WATCH_NAME, "n1");
-        let executed_block = self.execute(verified_block, transaction_parent)?;
+        let executed_block = self.execute(verified_block)?;
         watch(CHAIN_WATCH_NAME, "n2");
         self.connect(executed_block)
     }
@@ -407,6 +404,185 @@ impl BlockChain {
         self.connect(ExecutedBlock { block, block_info })
     }
 
+    fn execute_dag_block(&self, verified_block: VerifiedBlock) -> Result<ExecutedBlock> {
+        let block = verified_block.0;
+        let blues = block.uncles().expect("Blue blocks must exist");
+        let (selected_parent, blues) = blues.split_at(1);
+        let selected_parent = selected_parent[0].clone();
+        let block_info_past = self
+            .storage
+            .get_block_info(selected_parent.id())?
+            .expect("selected parent must executed");
+        let header = block.header();
+        let block_id = header.id();
+        let block_metadata = block.to_metadata(selected_parent.gas_used());
+        let mut transactions = vec![Transaction::BlockMetadata(block_metadata)];
+        let mut total_difficulty = header.difficulty() + block_info_past.total_difficulty;
+        for blue in blues {
+            let blue_block = self
+                .storage
+                .get_block_by_hash(blue.id())?
+                .expect("block blue need exist");
+            // Todo: we already added txns of blue_blocks to target block when mining it.
+            // see create_block_template in MinerService
+            //transactions.extend(
+            //    blue_block
+            //        .transactions()
+            //        .iter()
+            //        .cloned()
+            //        .map(Transaction::UserTransaction),
+            //);
+            total_difficulty += blue_block.header.difficulty();
+        }
+        transactions.extend(
+            block
+                .transactions()
+                .iter()
+                .cloned()
+                .map(Transaction::UserTransaction),
+        );
+
+        watch(CHAIN_WATCH_NAME, "n21");
+        let executed_data = starcoin_executor::block_execute(
+            &self.statedb,
+            transactions.clone(),
+            self.epoch.block_gas_limit(), //TODO: Fix me
+            self.vm_metrics.clone(),
+        )?;
+        watch(CHAIN_WATCH_NAME, "n22");
+        let state_root = executed_data.state_root;
+        let vec_transaction_info = &executed_data.txn_infos;
+        verify_block!(
+            VerifyBlockField::State,
+            state_root == header.state_root(),
+            "verify block:{:?} state_root fail",
+            block_id,
+        );
+        let block_gas_used = vec_transaction_info
+            .iter()
+            .fold(0u64, |acc, i| acc.saturating_add(i.gas_used()));
+        verify_block!(
+            VerifyBlockField::State,
+            block_gas_used == header.gas_used(),
+            "invalid block: gas_used is not match"
+        );
+
+        verify_block!(
+            VerifyBlockField::State,
+            vec_transaction_info.len() == transactions.len(),
+            "invalid txn num in the block"
+        );
+        let txn_accumulator = info_2_accumulator(
+            block_info_past.txn_accumulator_info,
+            AccumulatorStoreType::Transaction,
+            self.storage.as_ref(),
+        );
+        let block_accumulator = info_2_accumulator(
+            block_info_past.block_accumulator_info,
+            AccumulatorStoreType::Block,
+            self.storage.as_ref(),
+        );
+        let transaction_global_index = txn_accumulator.num_leaves();
+
+        // txn accumulator verify.
+        let executed_accumulator_root = {
+            let included_txn_info_hashes: Vec<_> =
+                vec_transaction_info.iter().map(|info| info.id()).collect();
+            txn_accumulator.append(&included_txn_info_hashes)?
+        };
+
+        verify_block!(
+            VerifyBlockField::State,
+            executed_accumulator_root == header.txn_accumulator_root(),
+            "verify block: txn accumulator root mismatch"
+        );
+
+        watch(CHAIN_WATCH_NAME, "n23");
+        self.statedb
+            .flush()
+            .map_err(BlockExecutorError::BlockChainStateErr)?;
+        // If chain state is matched, and accumulator is matched,
+        // then, we save flush states, and save block data.
+        watch(CHAIN_WATCH_NAME, "n24");
+        txn_accumulator
+            .flush()
+            .map_err(|_err| BlockExecutorError::BlockAccumulatorFlushErr)?;
+
+        block_accumulator.append(&[block_id])?;
+        block_accumulator.flush()?;
+
+        let txn_accumulator_info: AccumulatorInfo = txn_accumulator.get_info();
+        let block_accumulator_info: AccumulatorInfo = block_accumulator.get_info();
+        let block_info = BlockInfo::new(
+            block_id,
+            total_difficulty,
+            txn_accumulator_info,
+            block_accumulator_info,
+        );
+
+        watch(CHAIN_WATCH_NAME, "n25");
+
+        // save block's transaction relationship and save transaction
+
+        let block_id = block.id();
+        let txn_infos = executed_data.txn_infos;
+        let txn_events = executed_data.txn_events;
+        let txn_table_infos = executed_data
+            .txn_table_infos
+            .into_iter()
+            .collect::<Vec<_>>();
+
+        debug_assert!(
+            txn_events.len() == txn_infos.len(),
+            "events' length should be equal to txn infos' length"
+        );
+        let txn_info_ids: Vec<_> = txn_infos.iter().map(|info| info.id()).collect();
+        for (info_id, events) in txn_info_ids.iter().zip(txn_events.into_iter()) {
+            self.storage.save_contract_events(*info_id, events)?;
+        }
+
+        self.storage.save_transaction_infos(
+            txn_infos
+                .into_iter()
+                .enumerate()
+                .map(|(transaction_index, info)| {
+                    RichTransactionInfo::new(
+                        block_id,
+                        block.header().number(),
+                        info,
+                        transaction_index as u32,
+                        transaction_global_index
+                            .checked_add(transaction_index as u64)
+                            .expect("transaction_global_index overflow."),
+                    )
+                })
+                .collect(),
+        )?;
+
+        let txn_id_vec = transactions
+            .iter()
+            .map(|user_txn| user_txn.id())
+            .collect::<Vec<HashValue>>();
+        // save transactions
+        self.storage.save_transaction_batch(transactions)?;
+
+        // save block's transactions
+        self.storage
+            .save_block_transaction_ids(block_id, txn_id_vec)?;
+        self.storage
+            .save_block_txn_info_ids(block_id, txn_info_ids)?;
+        self.storage.commit_block(block.clone())?;
+        self.storage.save_block_info(block_info.clone())?;
+
+        self.storage.save_table_infos(txn_table_infos)?;
+        self.dag
+            .clone()
+            .expect("dag should init in blockchain")
+            .commit(header.to_owned())?;
+        watch(CHAIN_WATCH_NAME, "n26");
+        Ok(ExecutedBlock { block, block_info })
+    }
+
     //TODO consider move this logic to BlockExecutor
     fn execute_block_and_save(
         storage: &dyn Store,
@@ -416,7 +592,6 @@ impl BlockChain {
         epoch: &Epoch,
         parent_status: Option<ChainStatus>,
         block: Block,
-        transaction_parent: Option<HashValue>,
         vm_metrics: Option<VMMetrics>,
     ) -> Result<ExecutedBlock> {
         let header = block.header();
@@ -568,9 +743,7 @@ impl BlockChain {
         storage.save_block_txn_info_ids(block_id, txn_info_ids)?;
         storage.commit_block(block.clone())?;
         storage.save_block_info(block_info.clone())?;
-
         storage.save_table_infos(txn_table_infos)?;
-
         watch(CHAIN_WATCH_NAME, "n26");
         Ok(ExecutedBlock { block, block_info })
     }
@@ -826,22 +999,21 @@ impl ChainReader for BlockChain {
         FullVerifier::verify_block(self, block)
     }
 
-    fn execute(
-        &self,
-        verified_block: VerifiedBlock,
-        transaction_parent: Option<HashValue>,
-    ) -> Result<ExecutedBlock> {
-        Self::execute_block_and_save(
-            self.storage.as_ref(),
-            self.statedb.fork(),
-            self.txn_accumulator.fork(None),
-            self.block_accumulator.fork(None),
-            &self.epoch,
-            Some(self.status.status.clone()),
-            verified_block.0,
-            transaction_parent,
-            self.vm_metrics.clone(),
-        )
+    fn execute(&self, verified_block: VerifiedBlock) -> Result<ExecutedBlock> {
+        if !verified_block.0.is_dag() {
+            Self::execute_block_and_save(
+                self.storage.as_ref(),
+                self.statedb.fork(),
+                self.txn_accumulator.fork(None),
+                self.block_accumulator.fork(None),
+                &self.epoch,
+                Some(self.status.status.clone()),
+                verified_block.0,
+                self.vm_metrics.clone(),
+            )
+        } else {
+            self.execute_dag_block(verified_block)
+        }
     }
 
     fn get_transaction_infos(
@@ -1044,6 +1216,67 @@ impl BlockChain {
         }
         Ok(event_with_infos)
     }
+
+    fn connect_dag(&mut self, executed_block: ExecutedBlock) -> Result<ExecutedBlock> {
+        let dag = self.dag.clone().expect("dag should init with blockdag");
+        let (new_tip_block, _) = (executed_block.block(), executed_block.block_info());
+        let mut tips = self
+            .status
+            .dag_tips()
+            .expect("Tips should exist on dag")
+            .clone();
+        let parents = executed_block
+            .block
+            .header
+            .parents_hash()
+            .expect("Dag parents need exist");
+        for hash in parents {
+            tips.retain(|x| *x != hash);
+        }
+        tips.push(new_tip_block.id());
+
+        let block_hash = {
+            let ghost_of_tips = dag.ghostdata(tips.as_slice());
+            ghost_of_tips.selected_parent
+        };
+        let (block, block_info) = {
+            let block = self
+                .storage
+                .get_block(block_hash)?
+                .expect("Dag block should exist");
+            let block_info = self
+                .storage
+                .get_block_info(block_hash)?
+                .expect("Dag block info should exist");
+            (block, block_info)
+        };
+
+        let txn_accumulator_info = block_info.get_txn_accumulator_info();
+        let block_accumulator_info = block_info.get_block_accumulator_info();
+        let state_root = block.header().state_root();
+
+        self.txn_accumulator = info_2_accumulator(
+            txn_accumulator_info.clone(),
+            AccumulatorStoreType::Transaction,
+            self.storage.as_ref(),
+        );
+        self.block_accumulator = info_2_accumulator(
+            block_accumulator_info.clone(),
+            AccumulatorStoreType::Block,
+            self.storage.as_ref(),
+        );
+
+        self.statedb = ChainStateDB::new(self.storage.clone().into_super_arc(), Some(state_root));
+
+        self.status = ChainStatusWithBlock {
+            status: ChainStatus::new(block.header().clone(), block_info.clone(), Some(tips)),
+            head: block.clone(),
+        };
+        if self.epoch.end_block_number() == block.header().number() {
+            self.epoch = get_epoch_from_statedb(&self.statedb)?;
+        }
+        Ok(executed_block)
+    }
 }
 
 impl ChainWriter for BlockChain {
@@ -1051,13 +1284,31 @@ impl ChainWriter for BlockChain {
         if executed_block.block.header().parent_hash() == self.status.status.head().id() {
             return true;
         } else {
-            // jacktest: TODO: check if the parents is in the dag?
-            return true;
+            return Self::calculate_dag_accumulator_key(
+                self.status
+                    .status
+                    .tips_hash
+                    .as_ref()
+                    .expect("dag blocks must have tips")
+                    .clone(),
+            )
+            .expect("failed to calculate the tips hash")
+                == executed_block.block().header().parent_hash();
         }
     }
+
     fn connect(&mut self, executed_block: ExecutedBlock) -> Result<ExecutedBlock> {
         let (block, block_info) = (executed_block.block(), executed_block.block_info());
-        debug_assert!(block.header().parent_hash() == self.status.status.head().id());
+        if self.status.status.tips_hash.is_some() {
+            let mut tips = self.status.status.tips_hash.clone().unwrap();
+            tips.sort();
+            debug_assert!(
+                block.header().parent_hash() == Self::calculate_dag_accumulator_key(tips.clone())?
+                    || block.header().parent_hash() == self.status.status.head().id()
+            );
+        } else {
+            debug_assert!(block.header().parent_hash() == self.status.status.head().id());
+        }
         //TODO try reuse accumulator and state db.
         let txn_accumulator_info = block_info.get_txn_accumulator_info();
         let block_accumulator_info = block_info.get_block_accumulator_info();
@@ -1074,8 +1325,18 @@ impl ChainWriter for BlockChain {
         );
 
         self.statedb = ChainStateDB::new(self.storage.clone().into_super_arc(), Some(state_root));
+        let tips = self.status.status.tips_hash.clone();
+        let next_tips = match tips {
+            Some(mut tips) => {
+                if !tips.contains(&block.header().id()) {
+                    tips.push(block.header().id());
+                }
+                Some(tips)
+            }
+            None => None,
+        };
         self.status = ChainStatusWithBlock {
-            status: ChainStatus::new(block.header().clone(), block_info.clone()),
+            status: ChainStatus::new(block.header().clone(), block_info.clone(), next_tips),
             head: block.clone(),
         };
         if self.epoch.end_block_number() == block.header().number() {
