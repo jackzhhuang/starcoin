@@ -161,6 +161,20 @@ impl MockChain {
             .create_block(template, self.net.time_service().as_ref())
     }
 
+    pub fn produce_block_by_header(&mut self, parent_header: BlockHeader) -> Result<Block> {
+        let (template, _) = self.head.create_block_template_by_header(
+            *self.miner.address(),
+            parent_header,
+            vec![],
+            vec![],
+            None,
+            None,
+        )?;
+        self.head
+            .consensus()
+            .create_block(template, self.net.time_service().as_ref())
+    }
+
     pub fn apply(&mut self, block: Block) -> Result<()> {
         self.head.apply(block)?;
         Ok(())
@@ -175,7 +189,8 @@ impl MockChain {
 
     pub fn produce_and_apply_times(&mut self, times: u64) -> Result<()> {
         for _i in 0..times {
-            self.produce_and_apply()?;
+            let result = self.produce_and_apply();
+            println!("jacktest: produce_and_apply_times: {:?}", result?);
         }
         Ok(())
     }

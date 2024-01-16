@@ -506,8 +506,10 @@ where
                             )?;
                         }
                         None => {
-                            for (block, _peer_id) in
-                                self.fetcher.fetch_blocks(vec![*ancestor_block_header_id]).await?
+                            for (block, _peer_id) in self
+                                .fetcher
+                                .fetch_blocks(vec![*ancestor_block_header_id])
+                                .await?
                             {
                                 if self.chain.has_dag_block(block.id())? {
                                     continue;

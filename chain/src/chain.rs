@@ -242,7 +242,7 @@ impl BlockChain {
             None => self.current_header(),
         };
 
-        self.create_block_template_inner(
+        self.create_block_template_by_header(
             author,
             previous_header,
             user_txns,
@@ -252,7 +252,7 @@ impl BlockChain {
         )
     }
 
-    fn create_block_template_inner(
+    pub fn create_block_template_by_header(
         &self,
         author: AccountAddress,
         previous_header: BlockHeader,
@@ -267,12 +267,21 @@ impl BlockChain {
         let final_block_gas_limit = block_gas_limit
             .map(|block_gas_limit| min(block_gas_limit, on_chain_block_gas_limit))
             .unwrap_or(on_chain_block_gas_limit);
+        println!(
+            "jacktest: current_number: {:?}, dag fork height: {:?}",
+            current_number,
+            self.dag_fork_height()
+        );
         let tips_hash = if current_number <= self.dag_fork_height() {
+            println!("jacktest: return tips None");
             None
         } else if tips.is_some() {
+            println!("jacktest: tips is some, return tips, tips: {:?}", tips);
             tips
         } else {
-            self.current_tips_hash()?
+            let s = self.current_tips_hash()?;
+            println!("jacktest: return current_tips_hash: {:?}", s);
+            s
         };
         let strategy = epoch.strategy();
         let difficulty = strategy.calculate_next_difficulty(self)?;

@@ -3,6 +3,10 @@
 
 #[cfg(test)]
 use super::CheckBlockConnectorHashValue;
+#[cfg(test)]
+use super::CreateBlockRequest;
+#[cfg(test)]
+use super::CreateBlockResponse;
 use crate::block_connector::{ExecuteRequest, ResetRequest, WriteBlockChainService};
 use crate::sync::{CheckSyncEvent, SyncService};
 use crate::tasks::{BlockConnectedEvent, BlockConnectedFinishEvent, BlockDiskCheckEvent};
@@ -27,6 +31,7 @@ use starcoin_txpool_api::TxPoolSyncService;
 #[cfg(test)]
 use starcoin_txpool_mock_service::MockTxPoolService;
 use starcoin_types::block::ExecutedBlock;
+use starcoin_types::startup_info::ChainStatus;
 use starcoin_types::sync_status::SyncStatus;
 use starcoin_types::system_events::{MinedBlock, SyncStatusChangeEvent, SystemShutdown};
 use std::sync::Arc;
@@ -371,6 +376,31 @@ where
         _ctx: &mut ServiceContext<BlockConnectorService<TransactionPoolServiceT>>,
     ) -> Result<ExecutedBlock> {
         self.chain_service.execute(msg.block)
+    }
+}
+
+#[cfg(test)]
+impl<TransactionPoolServiceT> ServiceHandler<Self, CreateBlockRequest>
+    for BlockConnectorService<TransactionPoolServiceT>
+where
+    TransactionPoolServiceT: TxPoolSyncService + 'static,
+{
+    fn handle(
+        &mut self,
+        msg: CreateBlockRequest,
+        ctx: &mut ServiceContext<Self>,
+    ) -> <CreateBlockRequest as starcoin_service_registry::ServiceRequest>::Response {
+        for _i in 0..msg.count {
+            let block = self.chain_service.create_block(msg.author, 
+                msg.parent_hash, 
+                msg.user_txns.clone(),
+                msg.uncles.clone(),
+                msg.block_gas_limit,
+                msg.tips.clone(),
+            )?;
+            self.chain_service.try_connect(block)?;
+        }
+        Ok(CreateBlockResponse)
     }
 }
 

@@ -184,6 +184,7 @@ impl NodeHandle {
 
     /// Just for test
     pub fn generate_block(&self) -> Result<Block> {
+        println!("jacktest: generate_block: start1");
         let registry = &self.registry;
         block_on(async move {
             let bus = registry.service_ref::<BusService>().await?;
@@ -193,7 +194,7 @@ impl NodeHandle {
             let receiver = bus.oneshot::<NewHeadBlock>().await?;
             bus.broadcast(GenerateBlockEvent::new_break(true))?;
             let block = if let Ok(Ok(event)) =
-                async_std::future::timeout(Duration::from_secs(5), receiver).await
+                async_std::future::timeout(Duration::from_secs(20), receiver).await
             {
                 //wait for new block event to been processed.
                 Delay::new(Duration::from_millis(100)).await;
@@ -205,6 +206,10 @@ impl NodeHandle {
                     head.header(),
                     latest_head.header
                 );
+                println!("jacktest: generate_block: start1");
+                println!("jacktest: generate_block: head.header.number: {:?}, latest_head.header().number: {:?}",
+                    head.header().number(),
+                    latest_head.header().number());
                 if latest_head.header().number() > head.header().number() {
                     latest_head
                 } else {

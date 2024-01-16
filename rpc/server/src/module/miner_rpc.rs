@@ -8,6 +8,7 @@ use starcoin_rpc_api::miner::MinerApi;
 use starcoin_rpc_api::types::MintedBlockView;
 use starcoin_rpc_api::FutureResult;
 use starcoin_service_registry::ServiceRef;
+use starcoin_txpool::TxPoolService;
 use starcoin_types::block::BlockHeaderExtra;
 use starcoin_types::system_events::MintBlockEvent;
 use std::convert::TryInto;

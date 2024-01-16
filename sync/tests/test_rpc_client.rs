@@ -20,7 +20,8 @@ struct DagBlockInfo {
 
 #[stest::test]
 fn test_verified_client_for_dag() {
-    starcoin_types::block::set_test_flexidag_fork_height(2);
+    println!("jacktest: generate_block: start4");
+    starcoin_types::block::set_test_flexidag_fork_height(10);
     let (local_handle, target_handle, target_peer_id) =
         init_two_node().expect("failed to initalize the local and target node");
 
@@ -32,8 +33,10 @@ fn test_verified_client_for_dag() {
     let peer_selector = PeerSelector::new(vec![peer_info], PeerStrategy::default(), None);
     let rpc_client = VerifiedRpcClient::new(peer_selector, network);
     // testing dag rpc
+    println!("jacktest: generate_block: start2");
     let target_dag_blocks =
         generate_dag_block(&target_handle, 5).expect("failed to generate dag block");
+    println!("jacktest: generate_block: start3");
     target_dag_blocks.into_iter().for_each(|target_dag_block| {
         let dag_children_from_client_rpc =
             block_on(rpc_client.get_dag_block_children(vec![target_dag_block.header.id()]))

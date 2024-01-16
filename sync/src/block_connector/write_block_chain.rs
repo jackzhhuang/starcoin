@@ -21,6 +21,12 @@ use starcoin_types::{
     system_events::{NewBranch, NewHeadBlock},
 };
 use std::{fmt::Formatter, sync::Arc};
+#[cfg(test)]
+use starcoin_consensus::Consensus;
+#[cfg(test)]
+use starcoin_vm_types::{
+    account_address::AccountAddress, transaction::SignedUserTransaction,
+};
 
 use super::BlockConnectorService;
 
@@ -175,6 +181,32 @@ where
 
     pub fn get_main(&self) -> &BlockChain {
         &self.main
+    }
+
+    #[cfg(test)]
+    pub fn create_block(
+        &self,
+        author: AccountAddress,
+        parent_hash: Option<HashValue>,
+        user_txns: Vec<SignedUserTransaction>,
+        uncles: Vec<BlockHeader>,
+        block_gas_limit: Option<u64>,
+        tips: Option<Vec<HashValue>>,
+    ) -> Result<Block> {
+
+        let (block_template, transactions) = self.main.create_block_template(
+            author,
+            parent_hash,
+            user_txns,
+            uncles,
+            block_gas_limit,
+            tips,
+        )?;
+        Ok(self
+            .main
+            .consensus()
+            .create_block(block_template, self.main.time_service().as_ref())
+            .unwrap())
     }
 
     #[cfg(test)]
