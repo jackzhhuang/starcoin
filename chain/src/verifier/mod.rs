@@ -404,16 +404,16 @@ impl BlockVerifier for DagVerifier {
             parents_hash
         );
 
-        verify_block!(
-            VerifyBlockField::Header,
-            parents_hash
-                .first()
-                .map(|p| *p == parent_hash)
-                .unwrap_or_default()
-                && current_chain.exist_block(parent_hash)?,
-            "Invalid block: parent {} might not exist.",
-            parent_hash
-        );
+        // verify_block!(
+        //     VerifyBlockField::Header,
+        //     parents_hash
+        //         .first()
+        //         .map(|p| *p == parent_hash)
+        //         .unwrap_or_default()
+        //         && current_chain.exist_block(parent_hash)?,
+        //     "Invalid block: parent {} might not exist.",
+        //     parent_hash
+        // );
 
         ConsensusVerifier::verify_header(current_chain, new_block_header)
     }

@@ -184,7 +184,6 @@ impl NodeHandle {
 
     /// Just for test
     pub fn generate_block(&self) -> Result<Block> {
-        println!("jacktest: generate_block: start1");
         let registry = &self.registry;
         block_on(async move {
             let bus = registry.service_ref::<BusService>().await?;
@@ -206,10 +205,6 @@ impl NodeHandle {
                     head.header(),
                     latest_head.header
                 );
-                println!("jacktest: generate_block: start1");
-                println!("jacktest: generate_block: head.header.number: {:?}, latest_head.header().number: {:?}",
-                    head.header().number(),
-                    latest_head.header().number());
                 if latest_head.header().number() > head.header().number() {
                     latest_head
                 } else {

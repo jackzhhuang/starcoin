@@ -267,21 +267,12 @@ impl BlockChain {
         let final_block_gas_limit = block_gas_limit
             .map(|block_gas_limit| min(block_gas_limit, on_chain_block_gas_limit))
             .unwrap_or(on_chain_block_gas_limit);
-        println!(
-            "jacktest: current_number: {:?}, dag fork height: {:?}",
-            current_number,
-            self.dag_fork_height()
-        );
         let tips_hash = if current_number <= self.dag_fork_height() {
-            println!("jacktest: return tips None");
             None
         } else if tips.is_some() {
-            println!("jacktest: tips is some, return tips, tips: {:?}", tips);
             tips
         } else {
-            let s = self.current_tips_hash()?;
-            println!("jacktest: return current_tips_hash: {:?}", s);
-            s
+            self.current_tips_hash()?
         };
         let strategy = epoch.strategy();
         let difficulty = strategy.calculate_next_difficulty(self)?;

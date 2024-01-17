@@ -189,8 +189,7 @@ impl MockChain {
 
     pub fn produce_and_apply_times(&mut self, times: u64) -> Result<()> {
         for _i in 0..times {
-            let result = self.produce_and_apply();
-            println!("jacktest: produce_and_apply_times: {:?}", result?);
+            self.produce_and_apply()?;
         }
         Ok(())
     }

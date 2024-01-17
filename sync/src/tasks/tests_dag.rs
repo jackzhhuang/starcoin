@@ -139,8 +139,6 @@ async fn test_sync_red_blocks_dag() -> Result<()> {
         sync_block_process(target_node, local_node, &test_system.registry).await?;
 
     // the blocks following the 10th block will be blue dag blocks
-    // Arc::get_mut(&mut target_node).unwrap().produce_block(20).expect("failed to produce block");
-    println!("jacktest: sync end, now local node produce blocks");
     let block_connect_service = test_system
         .registry
         .service_ref::<BlockConnectorService<MockTxPoolService>>()
@@ -154,11 +152,7 @@ async fn test_sync_red_blocks_dag() -> Result<()> {
         uncles: vec![],
         block_gas_limit: None,
         tips: None,
-    }).await?;
-    async_std::task::sleep(Duration::from_secs(10)).await;
-    // Arc::get_mut(&mut local_node).unwrap().produce_block(10).expect("failed to produce block");
-
-    // println!("jacktest: target_node chain hash: {:?}, number: {:?}", target_node.chain().status().head.id(), target_node.chain().status().head.number());
+    }).await??;
 
     let chain_reader_service = test_system
         .registry
@@ -169,8 +163,8 @@ async fn test_sync_red_blocks_dag() -> Result<()> {
         .await??
     {
         ChainResponse::ChainStatus(chain_status) => {
-            println!(
-                "jacktest: local_node chain hash: {:?}, number: {:?}",
+            debug!(
+                "local_node chain hash: {:?}, number: {:?}",
                 chain_status.head.id(),
                 chain_status.head.number()
             );
@@ -180,10 +174,14 @@ async fn test_sync_red_blocks_dag() -> Result<()> {
         }
     }
 
+    Arc::get_mut(&mut target_node)
+    .unwrap()
+    .produce_block(10)
+    .expect("failed to produce block");
+
+    sync_block_process(target_node, local_node, &test_system.registry).await?;
     // // genertate the red blocks
     // Arc::get_mut(&mut target_node).unwrap().produce_block_by_header(dag_genesis_header, 5).expect("failed to produce block");
-
-    // println!("jacktest: target_node chain2 hash: {:?}, number: {:?}", target_node.chain().status().head.id(), target_node.chain().status().head.number());
 
     starcoin_types::block::reset_test_custom_fork_height();
     Ok(())
