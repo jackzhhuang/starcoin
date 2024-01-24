@@ -40,7 +40,6 @@ starcoin-service-registry = { workspace = true }
 starcoin-stratum = { workspace = true }
 stest = { workspace = true }
 thiserror = { workspace = true }
-starcoin-txpool = { workspace = true }
 
 [dev-dependencies]
 starcoin-miner = { workspace = true }

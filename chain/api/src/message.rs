@@ -63,6 +63,9 @@ pub enum ChainRequest {
     GetDagBlockChildren {
         block_ids: Vec<HashValue>,
     },
+    GetDagForkNumber,
+    #[cfg(feature = "testing")]
+    SetDagForkNumber(BlockNumber),
 }
 
 impl ServiceRequest for ChainRequest {
@@ -91,4 +94,5 @@ pub enum ChainResponse {
     HashVec(Vec<HashValue>),
     TransactionProof(Box<Option<TransactionInfoWithProof>>),
     BlockInfoVec(Box<Vec<Option<BlockInfo>>>),
+    DagForkNumber(BlockNumber),
 }

@@ -10,7 +10,6 @@ use futures::channel::mpsc::unbounded;
 use futures_timer::Delay;
 use pin_utils::core_reexport::time::Duration;
 use starcoin_account_api::AccountInfo;
-use starcoin_account_service::AccountService;
 use starcoin_chain_api::ChainReader;
 use starcoin_chain_service::ChainReaderService;
 use starcoin_config::{BuiltinNetworkID, ChainNetwork, NodeConfig, RocksdbConfig};
@@ -22,16 +21,14 @@ use starcoin_storage::db_storage::DBStorage;
 use starcoin_storage::storage::StorageInstance;
 use starcoin_storage::Storage;
 // use starcoin_txpool_mock_service::MockTxPoolService;
-use starcoin_miner::{BlockBuilderService, MinerService};
-use starcoin_txpool_api::TemplateTxProvider;
 #[cfg(test)]
 use starcoin_txpool_mock_service::MockTxPoolService;
-use starcoin_types::block::Block;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use stest::actix_export::System;
 use test_helper::DummyNetworkService;
+use starcoin_types::block::BlockNumber;
 
 #[cfg(test)]
 pub struct SyncTestSystem {
@@ -133,16 +130,18 @@ impl SyncTestSystem {
 }
 
 #[cfg(test)]
-pub async fn full_sync_new_node() -> Result<()> {
+pub async fn full_sync_new_node(fork_number: BlockNumber) -> Result<()> {
     let net1 = ChainNetwork::new_builtin(BuiltinNetworkID::Test);
     let mut node1 = SyncNodeMocker::new(net1, 300, 0)?;
+    node1.set_test_flexidag_fork_height(fork_number);
     node1.produce_block(10)?;
 
     let mut arc_node1 = Arc::new(node1);
 
     let net2 = ChainNetwork::new_builtin(BuiltinNetworkID::Test);
 
-    let node2 = SyncNodeMocker::new(net2.clone(), 300, 0)?;
+    let mut node2 = SyncNodeMocker::new(net2.clone(), 300, 0)?;
+    node2.set_test_flexidag_fork_height(fork_number);
 
     let target = arc_node1.sync_target();
 

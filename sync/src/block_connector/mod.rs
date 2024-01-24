@@ -17,11 +17,11 @@ mod write_block_chain;
 
 pub use block_connector_service::BlockConnectorService;
 #[cfg(test)]
-use starcoin_vm_types::account_address::AccountAddress;
+use starcoin_types::block::BlockHeader;
 #[cfg(test)]
 use starcoin_types::transaction::SignedUserTransaction;
 #[cfg(test)]
-use starcoin_types::block::BlockHeader;
+use starcoin_vm_types::account_address::AccountAddress;
 pub use write_block_chain::WriteBlockChainService;
 
 #[cfg(test)]

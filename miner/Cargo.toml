@@ -28,7 +28,6 @@ starcoin-vm-types = { workspace = true }
 tokio = { features = ["full"], workspace = true }
 starcoin-types = { package = "starcoin-types", workspace = true }
 starcoin-dag = { workspace =true }
-
 [dev-dependencies]
 starcoin-network-rpc = { package = "starcoin-network-rpc", workspace = true }
 starcoin-genesis = { workspace = true }
@@ -40,7 +39,6 @@ starcoin-time-service = { workspace = true }
 stest = { workspace = true }
 starcoin-sync = { package = "starcoin-sync", workspace = true }
 test-helper = { workspace = true }
-starcoin-txpool-mock-service = { workspace = true }
 
 [package]
 authors = { workspace = true }

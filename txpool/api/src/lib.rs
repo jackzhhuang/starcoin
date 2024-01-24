@@ -69,11 +69,6 @@ pub trait TxPoolSyncService: Clone + Send + Sync + Unpin {
     ) -> Vec<SignedUserTransaction>;
 }
 
-pub trait TemplateTxProvider {
-    fn get_txns(&self, max: u64) -> Vec<SignedUserTransaction>;
-    fn remove_invalid_txn(&self, txn_hash: HashValue);
-}
-
 #[derive(Clone, Debug)]
 pub struct PropagateTransactions {
     txns: Vec<SignedUserTransaction>,

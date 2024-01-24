@@ -4,9 +4,7 @@
 use anyhow::Result;
 use futures_channel::mpsc;
 use starcoin_crypto::hash::HashValue;
-use starcoin_txpool_api::{
-    TemplateTxProvider, TxPoolStatus, TxPoolSyncService, TxnStatusFullEvent,
-};
+use starcoin_txpool_api::{TxPoolStatus, TxPoolSyncService, TxnStatusFullEvent};
 use starcoin_types::{
     account_address::AccountAddress, block::Block, transaction, transaction::SignedUserTransaction,
 };
@@ -15,7 +13,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default)]
 pub struct MockTxPoolService {
     pool: Arc<Mutex<Vec<SignedUserTransaction>>>,
 }
@@ -102,16 +100,6 @@ impl TxPoolSyncService for MockTxPoolService {
         _max_len: Option<usize>,
     ) -> Vec<SignedUserTransaction> {
         todo!()
-    }
-}
-
-impl TemplateTxProvider for MockTxPoolService {
-    fn get_txns(&self, max: u64) -> Vec<SignedUserTransaction> {
-        self.get_pending_txns(Some(max), None)
-    }
-
-    fn remove_invalid_txn(&self, txn_hash: HashValue) {
-        self.remove_txn(txn_hash, true);
     }
 }
 

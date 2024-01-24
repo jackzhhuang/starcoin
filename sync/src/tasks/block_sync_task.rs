@@ -451,7 +451,7 @@ where
     }
 
     pub fn ensure_dag_parent_blocks_exist(&mut self, block_header: BlockHeader) -> Result<()> {
-        if !block_header.is_dag() {
+        if !self.chain.is_dag(&block_header) {
             info!(
                 "the block is not a dag block, skipping, its id: {:?}, its number {:?}",
                 block_header.id(),
@@ -645,7 +645,10 @@ where
         let state = self.check_enough();
         if let anyhow::Result::Ok(CollectorState::Enough) = &state {
             let current_header = self.chain.current_header();
-            let current_block = self.local_store.get_block(current_header.id())?.expect("failed to get the current block which should exist");
+            let current_block = self
+                .local_store
+                .get_block(current_header.id())?
+                .expect("failed to get the current block which should exist");
             return self.notify_connected_block(
                 current_block,
                 self.local_store

@@ -20,9 +20,7 @@ use starcoin_crypto::hash::HashValue;
 use starcoin_executor::VMMetrics;
 use starcoin_statedb::ChainStateDB;
 use starcoin_storage::Store;
-use starcoin_txpool_api::{
-    TemplateTxProvider, TxPoolStatus, TxPoolSyncService, TxnStatusFullEvent,
-};
+use starcoin_txpool_api::{TxPoolStatus, TxPoolSyncService, TxnStatusFullEvent};
 use starcoin_types::{
     account_address::AccountAddress,
     block::{Block, BlockHeader},
@@ -93,16 +91,6 @@ impl TxPoolService {
         self.get_inner()
             .get_pool_client()
             .verify_transaction(tx.into())
-    }
-}
-
-impl TemplateTxProvider for TxPoolService {
-    fn get_txns(&self, max: u64) -> Vec<SignedUserTransaction> {
-        self.get_pending_txns(Some(max), None)
-    }
-
-    fn remove_invalid_txn(&self, txn_hash: HashValue) {
-        self.remove_txn(txn_hash, true);
     }
 }
 

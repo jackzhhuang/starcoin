@@ -10,7 +10,6 @@ use starcoin_miner::{
 use starcoin_service_registry::{
     ActorService, EventHandler, ServiceContext, ServiceFactory, ServiceHandler, ServiceRef,
 };
-use starcoin_txpool::TxPoolService;
 use starcoin_types::system_events::MintBlockEvent;
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};

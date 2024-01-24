@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(clippy::integer_arithmetic)]
-use crate::block_connector::{BlockConnectorService, CheckBlockConnectorHashValue};
 use crate::tasks::block_sync_task::SyncBlockData;
 use crate::tasks::mock::{ErrorStrategy, MockBlockIdFetcher, SyncNodeMocker};
 use crate::tasks::{
@@ -18,34 +17,26 @@ use futures::FutureExt;
 use futures_timer::Delay;
 use network_api::{PeerId, PeerInfo, PeerSelector, PeerStrategy};
 use pin_utils::core_reexport::time::Duration;
-use starcoin_account_api::AccountInfo;
 use starcoin_accumulator::accumulator_info::AccumulatorInfo;
 use starcoin_accumulator::tree_store::mock::MockAccumulatorStore;
 use starcoin_accumulator::{Accumulator, MerkleAccumulator};
 use starcoin_chain::BlockChain;
 use starcoin_chain_api::ChainReader;
 use starcoin_chain_mock::MockChain;
-use starcoin_config::{BuiltinNetworkID, ChainNetwork, NodeConfig, RocksdbConfig};
+use starcoin_config::{BuiltinNetworkID, ChainNetwork};
 use starcoin_crypto::HashValue;
 use starcoin_dag::blockdag::BlockDAG;
-use starcoin_dag::consensusdb::prelude::FlexiDagStorageConfig;
 use starcoin_genesis::Genesis;
 use starcoin_logger::prelude::*;
-use starcoin_service_registry::{RegistryAsyncService, RegistryService, ServiceRef};
-use starcoin_storage::db_storage::DBStorage;
-use starcoin_storage::storage::StorageInstance;
 use starcoin_storage::{BlockStore, Storage};
 use starcoin_sync_api::SyncTarget;
-use starcoin_txpool_mock_service::MockTxPoolService;
+use starcoin_types::block::TEST_FLEXIDAG_FORK_HEIGHT_NEVER_REACH;
 use starcoin_types::{
     block::{Block, BlockBody, BlockHeaderBuilder, BlockIdAndNumber, BlockInfo},
     U256,
 };
 use std::collections::HashMap;
-use std::fs;
-use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use stest::actix_export::System;
 use stream_task::{
     DefaultCustomErrorHandle, Generator, TaskError, TaskEventCounterHandle, TaskGenerator,
 };
@@ -56,7 +47,7 @@ use super::BlockConnectedEvent;
 
 #[stest::test(timeout = 120)]
 pub async fn test_full_sync_new_node() -> Result<()> {
-    full_sync_new_node().await
+    full_sync_new_node(TEST_FLEXIDAG_FORK_HEIGHT_NEVER_REACH).await
 }
 
 #[stest::test]

@@ -11,6 +11,8 @@ use starcoin_dag::blockdag::BlockDAG;
 use starcoin_genesis::Genesis;
 use starcoin_logger::prelude::*;
 use starcoin_storage::Storage;
+#[cfg(feature = "testing")]
+use starcoin_types::block::BlockNumber;
 use starcoin_types::block::{Block, BlockHeader};
 use starcoin_types::startup_info::ChainInfo;
 use std::sync::Arc;
@@ -103,6 +105,11 @@ impl MockChain {
             None,
             self.head.dag(),
         )
+    }
+
+    #[cfg(any(feature = "testing", test))]
+    pub fn set_test_flexidag_fork_height(&mut self, fork_number: BlockNumber) {
+        self.head.set_test_flexidag_fork_height(fork_number);
     }
 
     pub fn fork(&self, head_id: Option<HashValue>) -> Result<MockChain> {

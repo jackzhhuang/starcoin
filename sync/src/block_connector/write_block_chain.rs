@@ -6,6 +6,8 @@ use anyhow::{format_err, Ok, Result};
 use starcoin_chain::BlockChain;
 use starcoin_chain_api::{ChainReader, ChainWriter, ConnectBlockError, WriteableChainService};
 use starcoin_config::NodeConfig;
+#[cfg(test)]
+use starcoin_consensus::Consensus;
 use starcoin_crypto::HashValue;
 use starcoin_dag::blockdag::BlockDAG;
 use starcoin_executor::VMMetrics;
@@ -20,13 +22,9 @@ use starcoin_types::{
     startup_info::StartupInfo,
     system_events::{NewBranch, NewHeadBlock},
 };
+#[cfg(test)]
+use starcoin_vm_types::{account_address::AccountAddress, transaction::SignedUserTransaction};
 use std::{fmt::Formatter, sync::Arc};
-#[cfg(test)]
-use starcoin_consensus::Consensus;
-#[cfg(test)]
-use starcoin_vm_types::{
-    account_address::AccountAddress, transaction::SignedUserTransaction,
-};
 
 use super::BlockConnectorService;
 
@@ -183,6 +181,10 @@ where
         &self.main
     }
 
+    pub fn get_dag(&self) -> BlockDAG {
+        self.dag.clone()
+    }
+
     #[cfg(test)]
     pub fn create_block(
         &self,
@@ -193,8 +195,7 @@ where
         block_gas_limit: Option<u64>,
         tips: Option<Vec<HashValue>>,
     ) -> Result<Block> {
-
-        let (block_template, transactions) = self.main.create_block_template(
+        let (block_template, _transactions) = self.main.create_block_template(
             author,
             parent_hash,
             user_txns,

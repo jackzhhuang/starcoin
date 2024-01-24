@@ -26,6 +26,8 @@ use starcoin_types::system_events::{GenerateBlockEvent, NewHeadBlock};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::runtime::Runtime;
+#[cfg(feature = "testing")]
+use starcoin_types::block::BlockNumber;
 
 pub mod crash_handler;
 mod genesis_parameter_resolve;
@@ -183,7 +185,7 @@ impl NodeHandle {
     }
 
     /// Just for test
-    pub fn generate_block(&self) -> Result<Block> {
+    pub fn generate_block(&self) -> Result<(Block, bool)> {
         let registry = &self.registry;
         block_on(async move {
             let bus = registry.service_ref::<BusService>().await?;
@@ -211,7 +213,20 @@ impl NodeHandle {
                     bail!("Wait timeout for generate_block")
                 }
             };
-            Ok(block)
+
+            let is_dag_block = chain_service.dag_fork_number().await? < block.header().number();
+            Ok((block, is_dag_block))
+        })
+    }
+
+    #[cfg(feature = "testing")]
+    pub fn set_dag_fork_number(&self, fork_number: BlockNumber) -> Result<()> {
+        use starcoin_chain_api::message::ChainResponse;
+
+        let registry = &self.registry;
+        block_on(async move {
+            let chain_service = registry.service_ref::<ChainReaderService>().await?;
+            chain_service.set_dag_fork_number(fork_number).await
         })
     }
 }

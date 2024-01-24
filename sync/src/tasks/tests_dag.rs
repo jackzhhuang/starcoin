@@ -2,7 +2,7 @@ use crate::{
     block_connector::{BlockConnectorService, CheckBlockConnectorHashValue, CreateBlockRequest},
     tasks::full_sync_task,
 };
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use super::mock::SyncNodeMocker;
 use super::test_tools::full_sync_new_node;
@@ -12,19 +12,16 @@ use starcoin_account_api::AccountInfo;
 use starcoin_chain_api::{message::ChainResponse, ChainReader};
 use starcoin_chain_service::ChainReaderService;
 use starcoin_logger::prelude::*;
-use starcoin_miner::MinerService;
 use starcoin_service_registry::{RegistryAsyncService, RegistryService, ServiceRef};
 use starcoin_txpool_mock_service::MockTxPoolService;
-use starcoin_types::system_events::{GenerateBlockEvent, MinedBlock};
+use starcoin_types::block::TEST_FLEXIDAG_FORK_HEIGHT_FOR_DAG;
 use test_helper::DummyNetworkService;
 
 #[stest::test(timeout = 120)]
 pub async fn test_full_sync_new_node_dag() {
-    starcoin_types::block::set_test_flexidag_fork_height(10);
-    full_sync_new_node()
+    full_sync_new_node(TEST_FLEXIDAG_FORK_HEIGHT_FOR_DAG)
         .await
         .expect("dag full sync should success");
-    starcoin_types::block::reset_test_custom_fork_height();
 }
 
 async fn sync_block_process(
@@ -103,8 +100,13 @@ async fn sync_block_in_block_connection_service_mock(
 
 #[stest::test(timeout = 600)]
 async fn test_sync_single_chain_to_dag_chain() -> Result<()> {
-    starcoin_types::block::set_test_flexidag_fork_height(10);
-    let test_system = super::test_tools::SyncTestSystem::initialize_sync_system().await?;
+    let mut test_system = super::test_tools::SyncTestSystem::initialize_sync_system().await?;
+    test_system
+        .target_node
+        .set_test_flexidag_fork_height(TEST_FLEXIDAG_FORK_HEIGHT_FOR_DAG);
+    test_system
+        .local_node
+        .set_test_flexidag_fork_height(TEST_FLEXIDAG_FORK_HEIGHT_FOR_DAG);
     let (_local_node, _target_node) = sync_block_in_block_connection_service_mock(
         Arc::new(test_system.target_node),
         Arc::new(test_system.local_node),
@@ -112,16 +114,20 @@ async fn test_sync_single_chain_to_dag_chain() -> Result<()> {
         40,
     )
     .await?;
-    starcoin_types::block::reset_test_custom_fork_height();
     Ok(())
 }
 
-#[stest::test(timeout = 600)]
+#[stest::test(timeout = 120)]
 async fn test_sync_red_blocks_dag() -> Result<()> {
-    starcoin_types::block::set_test_flexidag_fork_height(10);
-    let test_system = super::test_tools::SyncTestSystem::initialize_sync_system()
+    let mut test_system = super::test_tools::SyncTestSystem::initialize_sync_system()
         .await
         .expect("failed to init system");
+    test_system
+        .target_node
+        .set_test_flexidag_fork_height(TEST_FLEXIDAG_FORK_HEIGHT_FOR_DAG);
+    test_system
+        .local_node
+        .set_test_flexidag_fork_height(TEST_FLEXIDAG_FORK_HEIGHT_FOR_DAG);
     let mut target_node = Arc::new(test_system.target_node);
     let local_node = Arc::new(test_system.local_node);
     Arc::get_mut(&mut target_node)
@@ -135,7 +141,7 @@ async fn test_sync_red_blocks_dag() -> Result<()> {
         dag_genesis_header.number()
     );
 
-    let (mut local_node, mut target_node) =
+    let (local_node, mut target_node) =
         sync_block_process(target_node, local_node, &test_system.registry).await?;
 
     // the blocks following the 10th block will be blue dag blocks
@@ -143,16 +149,18 @@ async fn test_sync_red_blocks_dag() -> Result<()> {
         .registry
         .service_ref::<BlockConnectorService<MockTxPoolService>>()
         .await?;
-    let miner_info = AccountInfo::random(); 
-    block_connect_service.send(CreateBlockRequest { 
-        count: 3,
-        author: *miner_info.address(),
-        parent_hash: None,
-        user_txns: vec![],
-        uncles: vec![],
-        block_gas_limit: None,
-        tips: None,
-    }).await??;
+    let miner_info = AccountInfo::random();
+    block_connect_service
+        .send(CreateBlockRequest {
+            count: 3,
+            author: *miner_info.address(),
+            parent_hash: None,
+            user_txns: vec![],
+            uncles: vec![],
+            block_gas_limit: None,
+            tips: None,
+        })
+        .await??;
 
     let chain_reader_service = test_system
         .registry
@@ -175,14 +183,13 @@ async fn test_sync_red_blocks_dag() -> Result<()> {
     }
 
     Arc::get_mut(&mut target_node)
-    .unwrap()
-    .produce_block(10)
-    .expect("failed to produce block");
+        .unwrap()
+        .produce_block(10)
+        .expect("failed to produce block");
 
     sync_block_process(target_node, local_node, &test_system.registry).await?;
     // // genertate the red blocks
     // Arc::get_mut(&mut target_node).unwrap().produce_block_by_header(dag_genesis_header, 5).expect("failed to produce block");
 
-    starcoin_types::block::reset_test_custom_fork_height();
     Ok(())
 }

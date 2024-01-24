@@ -31,7 +31,6 @@ use starcoin_txpool_api::TxPoolSyncService;
 #[cfg(test)]
 use starcoin_txpool_mock_service::MockTxPoolService;
 use starcoin_types::block::ExecutedBlock;
-use starcoin_types::startup_info::ChainStatus;
 use starcoin_types::sync_status::SyncStatus;
 use starcoin_types::system_events::{MinedBlock, SyncStatusChangeEvent, SystemShutdown};
 use std::sync::Arc;
@@ -388,11 +387,12 @@ where
     fn handle(
         &mut self,
         msg: CreateBlockRequest,
-        ctx: &mut ServiceContext<Self>,
+        _ctx: &mut ServiceContext<Self>,
     ) -> <CreateBlockRequest as starcoin_service_registry::ServiceRequest>::Response {
         for _i in 0..msg.count {
-            let block = self.chain_service.create_block(msg.author, 
-                msg.parent_hash, 
+            let block = self.chain_service.create_block(
+                msg.author,
+                msg.parent_hash,
                 msg.user_txns.clone(),
                 msg.uncles.clone(),
                 msg.block_gas_limit,
