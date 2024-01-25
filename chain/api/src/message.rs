@@ -64,8 +64,6 @@ pub enum ChainRequest {
         block_ids: Vec<HashValue>,
     },
     GetDagForkNumber,
-    #[cfg(feature = "testing")]
-    SetDagForkNumber(BlockNumber),
 }
 
 impl ServiceRequest for ChainRequest {

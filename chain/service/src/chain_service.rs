@@ -244,11 +244,6 @@ impl ServiceHandler<Self, ChainRequest> for ChainReaderService {
                 self.inner.get_dag_block_children(block_ids)?,
             )),
             ChainRequest::GetDagForkNumber => Ok(ChainResponse::DagForkNumber(self.inner.main.dag_fork_height())),
-            ChainRequest::SetDagForkNumber(fork_number) => {
-                #[cfg(feature = "testing")]
-                self.inner.main.set_test_flexidag_fork_height(fork_number);
-                Ok(ChainResponse::DagForkNumber(self.inner.main.dag_fork_height()))
-            }
         }
     }
 }

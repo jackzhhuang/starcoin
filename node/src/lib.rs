@@ -18,7 +18,7 @@ use starcoin_node_api::node_service::NodeAsyncService;
 use starcoin_rpc_server::service::RpcService;
 use starcoin_service_registry::bus::{Bus, BusService};
 use starcoin_service_registry::{RegistryAsyncService, RegistryService, ServiceInfo, ServiceRef};
-use starcoin_storage::Storage;
+use starcoin_storage::{BlockStore, Storage, Store};
 use starcoin_sync::sync::SyncService;
 use starcoin_txpool::TxPoolService;
 use starcoin_types::block::Block;
@@ -26,7 +26,6 @@ use starcoin_types::system_events::{GenerateBlockEvent, NewHeadBlock};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::runtime::Runtime;
-#[cfg(feature = "testing")]
 use starcoin_types::block::BlockNumber;
 
 pub mod crash_handler;
@@ -219,15 +218,8 @@ impl NodeHandle {
         })
     }
 
-    #[cfg(feature = "testing")]
     pub fn set_dag_fork_number(&self, fork_number: BlockNumber) -> Result<()> {
-        use starcoin_chain_api::message::ChainResponse;
-
-        let registry = &self.registry;
-        block_on(async move {
-            let chain_service = registry.service_ref::<ChainReaderService>().await?;
-            chain_service.set_dag_fork_number(fork_number).await
-        })
+        self.storage().save_dag_fork_number(fork_number)
     }
 }
 

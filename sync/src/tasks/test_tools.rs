@@ -133,7 +133,7 @@ impl SyncTestSystem {
 pub async fn full_sync_new_node(fork_number: BlockNumber) -> Result<()> {
     let net1 = ChainNetwork::new_builtin(BuiltinNetworkID::Test);
     let mut node1 = SyncNodeMocker::new(net1, 300, 0)?;
-    node1.set_test_flexidag_fork_height(fork_number);
+    node1.set_dag_fork_number(fork_number);
     node1.produce_block(10)?;
 
     let mut arc_node1 = Arc::new(node1);
@@ -141,7 +141,7 @@ pub async fn full_sync_new_node(fork_number: BlockNumber) -> Result<()> {
     let net2 = ChainNetwork::new_builtin(BuiltinNetworkID::Test);
 
     let mut node2 = SyncNodeMocker::new(net2.clone(), 300, 0)?;
-    node2.set_test_flexidag_fork_height(fork_number);
+    node2.set_dag_fork_number(fork_number);
 
     let target = arc_node1.sync_target();
 

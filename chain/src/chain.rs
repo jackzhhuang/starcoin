@@ -63,8 +63,6 @@ pub struct BlockChain {
     epoch: Epoch,
     vm_metrics: Option<VMMetrics>,
     dag: BlockDAG,
-    #[cfg(feature = "testing")]
-    dag_fork_number: BlockNumber,
 }
 
 impl BlockChain {
@@ -125,8 +123,6 @@ impl BlockChain {
             epoch,
             vm_metrics,
             dag,
-            #[cfg(feature = "testing")]
-            dag_fork_number: TEST_FLEXIDAG_FORK_HEIGHT_NEVER_REACH,
         };
         watch(CHAIN_WATCH_NAME, "n1251");
         match uncles {
@@ -182,11 +178,6 @@ impl BlockChain {
 
     pub fn dag(&self) -> BlockDAG {
         self.dag.clone()
-    }
-
-    #[cfg(feature = "testing")]
-    pub fn set_test_flexidag_fork_height(&mut self, fork_number: BlockNumber) {
-        self.dag_fork_number = fork_number;
     }
 
     //TODO lazy init uncles cache.
@@ -1141,17 +1132,22 @@ impl ChainReader for BlockChain {
         self.dag.has_dag_block(hash)
     }
 
-    #[cfg(not(feature = "testing"))]
-    fn dag_fork_height(&self) -> BlockNumber {
-        TEST_FLEXIDAG_FORK_HEIGHT_NEVER_REACH
-    }
+    // #[cfg(not(feature = "testing"))]
+    // fn dag_fork_height(&self) -> BlockNumber {
+    //     TEST_FLEXIDAG_FORK_HEIGHT_NEVER_REACH
+    // }
 
-    #[cfg(feature = "testing")]
     fn dag_fork_height(&self) -> BlockNumber {
-        self.dag_fork_number
+        let fork_number = match self.storage.get_dag_fork_number().expect("failed to read dag fork number") {
+            Some(fork_number) => fork_number,
+            None => TEST_FLEXIDAG_FORK_HEIGHT_NEVER_REACH,
+        };
+        println!("jacktest: in is_dag, dag fork height: {:?}", fork_number);
+        fork_number
     }
 
     fn is_dag(&self, block_header: &BlockHeader) -> bool {
+        println!("jacktest: in is_dag, dag fork height: {:?}", self.dag_fork_height());
         block_header.number() > self.dag_fork_height()
     }
 
@@ -1160,6 +1156,7 @@ impl ChainReader for BlockChain {
     }
 
     fn is_dag_genesis(&self, block_header: &BlockHeader) -> bool {
+        println!("jacktest: in is_dag_genesis, dag fork height: {:?}", self.dag_fork_height());
         block_header.number() == self.dag_fork_height()
     }
 }

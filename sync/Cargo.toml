@@ -64,6 +64,9 @@ test-helper = { workspace = true }
 tokio = { features = ["full"], workspace = true }
 starcoin-genesis = { workspace = true }
 
+[features]
+testing = []
+
 [package]
 authors = { workspace = true }
 edition = { workspace = true }
