@@ -18,7 +18,7 @@ use starcoin_node_api::node_service::NodeAsyncService;
 use starcoin_rpc_server::service::RpcService;
 use starcoin_service_registry::bus::{Bus, BusService};
 use starcoin_service_registry::{RegistryAsyncService, RegistryService, ServiceInfo, ServiceRef};
-use starcoin_storage::{BlockStore, Storage, Store};
+use starcoin_storage::{BlockStore, Storage};
 use starcoin_sync::sync::SyncService;
 use starcoin_txpool::TxPoolService;
 use starcoin_types::block::Block;

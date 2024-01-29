@@ -342,9 +342,9 @@ impl SyncNodeMocker {
         self.chain_mocker.set_dag_fork_number(fork_number)
     }
 
-    pub fn get_dag_fork_number(&self) -> Result<Option<BlockNumber>> {
-        self.chain_mocker.get_dag_fork_number()
-    }
+    // pub fn get_dag_fork_number(&self) -> Result<Option<BlockNumber>> {
+    //     self.chain_mocker.get_dag_fork_number()
+    // }
 }
 
 impl PeerOperator for SyncNodeMocker {

@@ -8,7 +8,6 @@ use crate::tasks::{
     full_sync_task, AccumulatorCollector, AncestorCollector, BlockAccumulatorSyncTask,
     BlockCollector, BlockFetcher, BlockLocalStore, BlockSyncTask, FindAncestorTask, SyncFetcher,
 };
-use crate::verified_rpc_client::RpcVerifyError;
 use anyhow::{format_err, Result};
 use anyhow::{Context, Ok};
 use futures::channel::mpsc::unbounded;
@@ -30,19 +29,17 @@ use starcoin_genesis::Genesis;
 use starcoin_logger::prelude::*;
 use starcoin_storage::{BlockStore, Storage};
 use starcoin_sync_api::SyncTarget;
-use starcoin_types::block::TEST_FLEXIDAG_FORK_HEIGHT_NEVER_REACH;
+use starcoin_types::block::{TEST_FLEXIDAG_FORK_HEIGHT_FOR_DAG, TEST_FLEXIDAG_FORK_HEIGHT_NEVER_REACH};
 use starcoin_types::{
     block::{Block, BlockBody, BlockHeaderBuilder, BlockIdAndNumber, BlockInfo},
     U256,
 };
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use stream_task::{
-    DefaultCustomErrorHandle, Generator, TaskError, TaskEventCounterHandle, TaskGenerator,
-};
+use stream_task::{DefaultCustomErrorHandle, Generator, TaskEventCounterHandle, TaskGenerator};
 use test_helper::DummyNetworkService;
 
-use super::test_tools::{full_sync_new_node, SyncTestSystem};
+use super::test_tools::{full_sync_cancel, full_sync_continue, full_sync_fork, full_sync_fork_from_genesis, full_sync_new_node, sync_invalid_target, SyncTestSystem};
 use super::BlockConnectedEvent;
 
 #[stest::test(timeout = 120)]
@@ -52,55 +49,7 @@ pub async fn test_full_sync_new_node() -> Result<()> {
 
 #[stest::test]
 pub async fn test_sync_invalid_target() -> Result<()> {
-    let net1 = ChainNetwork::new_builtin(BuiltinNetworkID::Test);
-    let mut node1 = SyncNodeMocker::new(net1, 300, 0)?;
-    node1.produce_block(10)?;
-
-    let arc_node1 = Arc::new(node1);
-
-    let net2 = ChainNetwork::new_builtin(BuiltinNetworkID::Test);
-
-    let node2 = SyncNodeMocker::new(net2.clone(), 300, 0)?;
-    let dag = node2.chain().dag();
-    let mut target = arc_node1.sync_target();
-
-    target.block_info.total_difficulty = U256::max_value();
-
-    let current_block_header = node2.chain().current_header();
-
-    let storage = node2.chain().get_storage();
-    let (sender_1, receiver_1) = unbounded();
-    let (sender_2, _receiver_2) = unbounded();
-    let (sync_task, _task_handle, _task_event_counter) = full_sync_task(
-        current_block_header.id(),
-        target.clone(),
-        false,
-        net2.time_service(),
-        storage.clone(),
-        sender_1,
-        arc_node1.clone(),
-        sender_2,
-        DummyNetworkService::default(),
-        15,
-        None,
-        None,
-        dag,
-    )?;
-    let _join_handle = node2.process_block_connect_event(receiver_1).await;
-    let sync_result = sync_task.await;
-    assert!(sync_result.is_err());
-    let err = sync_result.err().unwrap();
-    debug!("task_error: {:?}", err);
-    assert!(err.is_break_error());
-    if let TaskError::BreakError(err) = err {
-        let verify_err = err.downcast::<RpcVerifyError>().unwrap();
-        assert_eq!(verify_err.peers[0].clone(), arc_node1.peer_id);
-        debug!("{:?}", verify_err)
-    } else {
-        panic!("Expect BreakError, but got: {:?}", err)
-    }
-
-    Ok(())
+    sync_invalid_target(TEST_FLEXIDAG_FORK_HEIGHT_NEVER_REACH).await
 }
 
 #[stest::test]
@@ -147,284 +96,22 @@ pub async fn test_failed_block() -> Result<()> {
 
 #[stest::test(timeout = 120)]
 pub async fn test_full_sync_fork() -> Result<()> {
-    let net1 = ChainNetwork::new_builtin(BuiltinNetworkID::Test);
-    let mut node1 = SyncNodeMocker::new(net1, 300, 0)?;
-    node1.produce_block(10)?;
-
-    let mut arc_node1 = Arc::new(node1);
-
-    let net2 = ChainNetwork::new_builtin(BuiltinNetworkID::Test);
-
-    let node2 = SyncNodeMocker::new(net2.clone(), 300, 0)?;
-
-    let target = arc_node1.sync_target();
-
-    let current_block_header = node2.chain().current_header();
-    let dag = node2.chain().dag();
-    let storage = node2.chain().get_storage();
-    let (sender, receiver) = unbounded();
-    let (sender_2, _receiver_2) = unbounded();
-    let (sync_task, _task_handle, task_event_counter) = full_sync_task(
-        current_block_header.id(),
-        target.clone(),
-        false,
-        net2.time_service(),
-        storage.clone(),
-        sender,
-        arc_node1.clone(),
-        sender_2,
-        DummyNetworkService::default(),
-        15,
-        None,
-        None,
-        dag.clone(),
-    )?;
-    let join_handle = node2.process_block_connect_event(receiver).await;
-    let branch = sync_task.await?;
-    let mut node2 = join_handle.await;
-    let current_block_header = node2.chain().current_header();
-    assert_eq!(branch.current_header().id(), target.target_id.id());
-    assert_eq!(target.target_id.id(), current_block_header.id());
-    let reports = task_event_counter.get_reports();
-    reports
-        .iter()
-        .for_each(|report| debug!("reports: {}", report));
-
-    //test fork
-
-    Arc::get_mut(&mut arc_node1).unwrap().produce_block(10)?;
-    node2.produce_block(5)?;
-
-    let (sender, receiver) = unbounded();
-    let target = arc_node1.sync_target();
-    let (sender_2, _receiver_2) = unbounded();
-    let (sync_task, _task_handle, task_event_counter) = full_sync_task(
-        current_block_header.id(),
-        target.clone(),
-        false,
-        net2.time_service(),
-        storage,
-        sender,
-        arc_node1.clone(),
-        sender_2,
-        DummyNetworkService::default(),
-        15,
-        None,
-        None,
-        dag,
-    )?;
-    let join_handle = node2.process_block_connect_event(receiver).await;
-    let branch = sync_task.await?;
-    let node2 = join_handle.await;
-    let current_block_header = node2.chain().current_header();
-    assert_eq!(branch.current_header().id(), target.target_id.id());
-    assert_eq!(target.target_id.id(), current_block_header.id());
-
-    let reports = task_event_counter.get_reports();
-    reports
-        .iter()
-        .for_each(|report| debug!("reports: {}", report));
-    Ok(())
+    full_sync_fork(TEST_FLEXIDAG_FORK_HEIGHT_NEVER_REACH).await
 }
 
 #[stest::test(timeout = 120)]
 pub async fn test_full_sync_fork_from_genesis() -> Result<()> {
-    let net1 = ChainNetwork::new_builtin(BuiltinNetworkID::Test);
-    let mut node1 = SyncNodeMocker::new(net1, 300, 0)?;
-    node1.produce_block(10)?;
-
-    let arc_node1 = Arc::new(node1);
-
-    let net2 = ChainNetwork::new_builtin(BuiltinNetworkID::Test);
-
-    //fork from genesis
-    let mut node2 = SyncNodeMocker::new(net2.clone(), 300, 0)?;
-    node2.produce_block(5)?;
-
-    let target = arc_node1.sync_target();
-
-    let current_block_header = node2.chain().current_header();
-    let dag = node2.chain().dag();
-    let storage = node2.chain().get_storage();
-    let (sender, receiver) = unbounded();
-    let (sender_2, _receiver_2) = unbounded();
-    let (sync_task, _task_handle, task_event_counter) = full_sync_task(
-        current_block_header.id(),
-        target.clone(),
-        false,
-        net2.time_service(),
-        storage.clone(),
-        sender,
-        arc_node1.clone(),
-        sender_2,
-        DummyNetworkService::default(),
-        15,
-        None,
-        None,
-        dag,
-    )?;
-    let join_handle = node2.process_block_connect_event(receiver).await;
-    let branch = sync_task.await?;
-    let node2 = join_handle.await;
-    let current_block_header = node2.chain().current_header();
-    assert_eq!(branch.current_header().id(), target.target_id.id());
-    assert_eq!(target.target_id.id(), current_block_header.id());
-    assert_eq!(
-        arc_node1.chain().current_header().id(),
-        current_block_header.id()
-    );
-    let reports = task_event_counter.get_reports();
-    reports
-        .iter()
-        .for_each(|report| debug!("reports: {}", report));
-
-    Ok(())
+    full_sync_fork_from_genesis(TEST_FLEXIDAG_FORK_HEIGHT_NEVER_REACH).await
 }
 
 #[stest::test(timeout = 120)]
 pub async fn test_full_sync_continue() -> Result<()> {
-    // let net1 = ChainNetwork::new_builtin(BuiltinNetworkID::Test);
-    let test_system = SyncTestSystem::initialize_sync_system().await?;
-    let mut node1 = test_system.target_node; // SyncNodeMocker::new(net1, 10, 50)?;
-    let dag = node1.chain().dag();
-    node1.produce_block(10)?;
-    let arc_node1 = Arc::new(node1);
-    let net2 = ChainNetwork::new_builtin(BuiltinNetworkID::Test);
-    //fork from genesis
-    let mut node2 = test_system.local_node; // SyncNodeMocker::new(net2.clone(), 1, 50)?;
-    node2.produce_block(7)?;
-
-    // first set target to 5.
-    let target = arc_node1.sync_target_by_number(5).unwrap();
-
-    let current_block_header = node2.chain().current_header();
-
-    let storage = node2.chain().get_storage();
-    let (sender, receiver) = unbounded();
-    let (sender_2, _receiver_2) = unbounded();
-    let (sync_task, _task_handle, task_event_counter) = full_sync_task(
-        current_block_header.id(),
-        target.clone(),
-        false,
-        net2.time_service(),
-        storage.clone(),
-        sender,
-        arc_node1.clone(),
-        sender_2,
-        DummyNetworkService::default(),
-        15,
-        None,
-        None,
-        dag.clone(),
-    )?;
-    let join_handle = node2.process_block_connect_event(receiver).await;
-    let branch = sync_task.await?;
-    let node2 = join_handle.await;
-
-    assert_eq!(branch.current_header().id(), target.target_id.id());
-    let current_block_header = node2.chain().current_header();
-    // node2's main chain not change.
-    assert_ne!(target.target_id.id(), current_block_header.id());
-
-    let reports = task_event_counter.get_reports();
-    reports
-        .iter()
-        .for_each(|report| debug!("task_report: {}", report));
-
-    //set target to latest.
-    let target = arc_node1.sync_target();
-
-    let (sender, receiver) = unbounded();
-    //continue sync
-    //TODO find a way to verify continue sync will reuse previous task local block.
-    let (sender_2, _receiver_2) = unbounded();
-    let (sync_task, _task_handle, task_event_counter) = full_sync_task(
-        current_block_header.id(),
-        target.clone(),
-        false,
-        net2.time_service(),
-        storage.clone(),
-        sender,
-        arc_node1.clone(),
-        sender_2,
-        DummyNetworkService::default(),
-        15,
-        None,
-        None,
-        dag,
-    )?;
-
-    let join_handle = node2.process_block_connect_event(receiver).await;
-    let branch = sync_task.await?;
-    let node2 = join_handle.await;
-    let current_block_header = node2.chain().current_header();
-    assert_eq!(branch.current_header().id(), target.target_id.id());
-    assert_eq!(target.target_id.id(), current_block_header.id());
-    assert_eq!(
-        arc_node1.chain().current_header().id(),
-        current_block_header.id()
-    );
-    let reports = task_event_counter.get_reports();
-    reports
-        .iter()
-        .for_each(|report| debug!("reports: {}", report));
-
-    Ok(())
+    full_sync_continue(TEST_FLEXIDAG_FORK_HEIGHT_NEVER_REACH).await
 }
 
 #[stest::test]
 pub async fn test_full_sync_cancel() -> Result<()> {
-    let net1 = ChainNetwork::new_builtin(BuiltinNetworkID::Test);
-    let mut node1 = SyncNodeMocker::new(net1, 300, 0)?;
-    node1.produce_block(10)?;
-
-    let arc_node1 = Arc::new(node1);
-
-    let net2 = ChainNetwork::new_builtin(BuiltinNetworkID::Test);
-
-    let node2 = SyncNodeMocker::new(net2.clone(), 10, 50)?;
-
-    let target = arc_node1.sync_target();
-
-    let current_block_header = node2.chain().current_header();
-    let dag = node2.chain().dag();
-    let storage = node2.chain().get_storage();
-    let (sender, receiver) = unbounded();
-    let (sender_2, _receiver_2) = unbounded();
-    let (sync_task, task_handle, task_event_counter) = full_sync_task(
-        current_block_header.id(),
-        target.clone(),
-        false,
-        net2.time_service(),
-        storage.clone(),
-        sender,
-        arc_node1.clone(),
-        sender_2,
-        DummyNetworkService::default(),
-        15,
-        None,
-        None,
-        dag,
-    )?;
-    let join_handle = node2.process_block_connect_event(receiver).await;
-    let sync_join_handle = tokio::task::spawn(sync_task);
-
-    Delay::new(Duration::from_millis(100)).await;
-
-    task_handle.cancel();
-    let sync_result = sync_join_handle.await?;
-    assert!(sync_result.is_err());
-    assert!(sync_result.err().unwrap().is_canceled());
-
-    let node2 = join_handle.await;
-    let current_block_header = node2.chain().current_header();
-    assert_ne!(target.target_id.id(), current_block_header.id());
-    let reports = task_event_counter.get_reports();
-    reports
-        .iter()
-        .for_each(|report| debug!("reports: {}", report));
-
-    Ok(())
+    full_sync_cancel(TEST_FLEXIDAG_FORK_HEIGHT_NEVER_REACH).await
 }
 
 #[ignore]

@@ -4,7 +4,7 @@ use crate::{
 };
 use std::sync::Arc;
 
-use super::mock::SyncNodeMocker;
+use super::{mock::SyncNodeMocker, test_tools::{full_sync_cancel, full_sync_continue, full_sync_fork, full_sync_fork_from_genesis, sync_invalid_target}};
 use super::test_tools::full_sync_new_node;
 use anyhow::{format_err, Result};
 use futures::channel::mpsc::unbounded;
@@ -100,13 +100,13 @@ async fn sync_block_in_block_connection_service_mock(
 
 #[stest::test(timeout = 600)]
 async fn test_sync_single_chain_to_dag_chain() -> Result<()> {
-    let mut test_system = super::test_tools::SyncTestSystem::initialize_sync_system().await?;
+    let test_system = super::test_tools::SyncTestSystem::initialize_sync_system().await?;
     test_system
         .target_node
-        .set_dag_fork_number(TEST_FLEXIDAG_FORK_HEIGHT_FOR_DAG);
+        .set_dag_fork_number(TEST_FLEXIDAG_FORK_HEIGHT_FOR_DAG)?;
     test_system
         .local_node
-        .set_dag_fork_number(TEST_FLEXIDAG_FORK_HEIGHT_FOR_DAG);
+        .set_dag_fork_number(TEST_FLEXIDAG_FORK_HEIGHT_FOR_DAG)?;
     let (_local_node, _target_node) = sync_block_in_block_connection_service_mock(
         Arc::new(test_system.target_node),
         Arc::new(test_system.local_node),
@@ -119,15 +119,15 @@ async fn test_sync_single_chain_to_dag_chain() -> Result<()> {
 
 #[stest::test(timeout = 120)]
 async fn test_sync_red_blocks_dag() -> Result<()> {
-    let mut test_system = super::test_tools::SyncTestSystem::initialize_sync_system()
+    let test_system = super::test_tools::SyncTestSystem::initialize_sync_system()
         .await
         .expect("failed to init system");
     test_system
         .target_node
-        .set_dag_fork_number(TEST_FLEXIDAG_FORK_HEIGHT_FOR_DAG);
+        .set_dag_fork_number(TEST_FLEXIDAG_FORK_HEIGHT_FOR_DAG)?;
     test_system
         .local_node
-        .set_dag_fork_number(TEST_FLEXIDAG_FORK_HEIGHT_FOR_DAG);
+        .set_dag_fork_number(TEST_FLEXIDAG_FORK_HEIGHT_FOR_DAG)?;
     let mut target_node = Arc::new(test_system.target_node);
     let local_node = Arc::new(test_system.local_node);
     Arc::get_mut(&mut target_node)
@@ -192,4 +192,30 @@ async fn test_sync_red_blocks_dag() -> Result<()> {
     // Arc::get_mut(&mut target_node).unwrap().produce_block_by_header(dag_genesis_header, 5).expect("failed to produce block");
 
     Ok(())
+}
+
+
+#[stest::test]
+pub async fn test_dag_sync_invalid_target() -> Result<()> {
+    sync_invalid_target(TEST_FLEXIDAG_FORK_HEIGHT_FOR_DAG).await
+}
+
+#[stest::test(timeout = 120)]
+pub async fn test_dag_full_sync_fork() -> Result<()> {
+    full_sync_fork(TEST_FLEXIDAG_FORK_HEIGHT_FOR_DAG).await
+}
+
+#[stest::test(timeout = 120)]
+pub async fn test_dag_full_sync_fork_from_genesis() -> Result<()> {
+    full_sync_fork_from_genesis(TEST_FLEXIDAG_FORK_HEIGHT_FOR_DAG).await
+}
+
+#[stest::test(timeout = 120)]
+pub async fn test_dag_full_sync_continue() -> Result<()> {
+    full_sync_continue(TEST_FLEXIDAG_FORK_HEIGHT_FOR_DAG).await
+}
+
+#[stest::test]
+pub async fn test_dag_full_sync_cancel() -> Result<()> {
+    full_sync_cancel(TEST_FLEXIDAG_FORK_HEIGHT_FOR_DAG).await
 }
