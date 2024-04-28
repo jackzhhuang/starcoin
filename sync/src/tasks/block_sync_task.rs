@@ -16,6 +16,7 @@ use starcoin_config::G_CRATE_VERSION;
 use starcoin_crypto::HashValue;
 use starcoin_logger::prelude::*;
 use starcoin_network_rpc_api::MAX_BLOCK_REQUEST_SIZE;
+use starcoin_storage::block::DagSyncBlock;
 use starcoin_storage::{Store, BARNARD_HARD_FORK_HASH};
 use starcoin_sync_api::SyncTarget;
 use starcoin_types::block::{Block, BlockHeader, BlockIdAndNumber, BlockInfo, BlockNumber};
@@ -504,6 +505,7 @@ where
                         );
                         process_dag_ancestors
                             .insert(block.header().id(), block.header().clone());
+                        self.local_store.delete_dag_sync_block(executed_block.block.id())?;
                         self.notify_connected_block(
                             executed_block.block,
                             executed_block.block_info.clone(),
@@ -629,13 +631,33 @@ where
 
     async fn fetch_block(
         &self,
-        block_ids: Vec<HashValue>,
+        mut block_ids: Vec<HashValue>,
     ) -> Result<Vec<(HashValue, Block)>> {
-        let mut result = vec![];
+        let mut result: Vec<(HashValue, Block)> = vec![];
+        block_ids.retain(|id| {
+            match self.local_store.get_dag_sync_block(*id) {
+                Ok(op_dag_sync_block) => {
+                    if let Some(dag_sync_block) = op_dag_sync_block {
+                        result.push((dag_sync_block.block.id(), dag_sync_block.block));
+                        false // read from local store, remove from p2p request
+                    } else {
+                        true // need retaining
+                    }
+                }
+                Err(_) => true // need retaining
+            }
+        });
         for chunk in block_ids.chunks(usize::try_from(MAX_BLOCK_REQUEST_SIZE)?) {
-            result.extend(self.fetcher.fetch_blocks(chunk.to_vec()).await?.into_iter().map(|(block, _)| {
-                (block.id(), block)
-            }));
+            let remote_dag_sync_blocks = self.fetcher.fetch_blocks(chunk.to_vec()).await?; 
+            for (block, _) in remote_dag_sync_blocks {
+                self.local_store.save_dag_sync_block(DagSyncBlock {
+                    block: block.clone(),
+                })?;
+                result.push((block.id(), block));
+            }
+            // result.extend(self.fetcher.fetch_blocks(chunk.to_vec()).await?.into_iter().map(|(block, _)| {
+            //     (block.id(), block)
+            // }));
         }
         Ok(result)
     }

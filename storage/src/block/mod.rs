@@ -40,7 +40,7 @@ impl Into<(Block, Option<PeerId>, String, String)> for OldFailedBlock {
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DagSyncBlock {
-    block: Block,
+    pub block: Block,
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]

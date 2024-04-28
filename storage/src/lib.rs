@@ -14,6 +14,7 @@ use crate::table_info::{TableInfoStorage, TableInfoStore};
 use crate::transaction::TransactionStorage;
 use crate::transaction_info::{TransactionInfoHashStorage, TransactionInfoStorage};
 use anyhow::{bail, format_err, Error, Result};
+use block::DagSyncBlock;
 use network_p2p_types::peer_id::PeerId;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use once_cell::sync::Lazy;
@@ -255,6 +256,16 @@ pub trait BlockStore {
 
     fn get_snapshot_range(&self) -> Result<Option<SnapshotRange>>;
     fn save_snapshot_range(&self, snapshot_height: SnapshotRange) -> Result<()>;
+
+    fn save_dag_sync_block(
+        &self,
+        block: DagSyncBlock,
+    ) -> Result<()>;
+    fn delete_dag_sync_block(&self, block_id: HashValue) -> Result<()>;
+    fn get_dag_sync_block(
+        &self,
+        block_id: HashValue,
+    ) -> Result<Option<DagSyncBlock>>;
 }
 
 pub trait BlockTransactionInfoStore {
@@ -500,6 +511,24 @@ impl BlockStore for Storage {
 
     fn save_snapshot_range(&self, snapshot_range: SnapshotRange) -> Result<()> {
         self.chain_info_storage.save_snapshot_range(snapshot_range)
+    }
+    
+    fn save_dag_sync_block(
+        &self,
+        block: DagSyncBlock,
+    ) -> Result<()> {
+        self.block_storage.save_dag_sync_block(block)
+    }
+    
+    fn delete_dag_sync_block(&self, block_id: HashValue) -> Result<()> {
+        self.block_storage.delete_dag_sync_block(block_id)
+    }
+    
+    fn get_dag_sync_block(
+        &self,
+        block_id: HashValue,
+    ) -> Result<Option<DagSyncBlock>> {
+        self.block_storage.get_dag_sync_block(block_id)
     }
 }
 
