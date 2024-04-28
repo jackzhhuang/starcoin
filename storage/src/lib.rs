@@ -81,6 +81,7 @@ pub const TABLE_INFO_PREFIX_NAME: ColumnFamilyName = "table_info";
 pub const BLOCK_PREFIX_NAME_V2: ColumnFamilyName = "block_v2";
 pub const BLOCK_HEADER_PREFIX_NAME_V2: ColumnFamilyName = "block_header_v2";
 pub const FAILED_BLOCK_PREFIX_NAME_V2: ColumnFamilyName = "failed_block_v2";
+pub const DAG_SYNC_BLOCK_PREFIX_NAME: ColumnFamilyName = "dag_sync_block";
 
 ///db storage use prefix_name vec to init
 /// Please note that adding a prefix needs to be added in vec simultaneously, remember！！
