@@ -148,6 +148,7 @@ static VEC_PREFIX_NAME_V3: Lazy<Vec<ColumnFamilyName>> = Lazy::new(|| {
         TABLE_INFO_PREFIX_NAME,
     ]
 });
+
 static VEC_PREFIX_NAME_V4: Lazy<Vec<ColumnFamilyName>> = Lazy::new(|| {
     vec![
         BLOCK_ACCUMULATOR_NODE_PREFIX_NAME,
@@ -173,6 +174,34 @@ static VEC_PREFIX_NAME_V4: Lazy<Vec<ColumnFamilyName>> = Lazy::new(|| {
     ]
 });
 
+// this is is for proxima. DAG_SYNC_BLOCK_PREFIX_NAME added.
+// DAG_SYNC_BLOCK_PREFIX_NAME should be in v4 when upgrading to the master version
+static VEC_PREFIX_NAME_V5: Lazy<Vec<ColumnFamilyName>> = Lazy::new(|| {
+    vec![
+        BLOCK_ACCUMULATOR_NODE_PREFIX_NAME,
+        TRANSACTION_ACCUMULATOR_NODE_PREFIX_NAME,
+        BLOCK_PREFIX_NAME,
+        BLOCK_HEADER_PREFIX_NAME,
+        BLOCK_PREFIX_NAME_V2,
+        BLOCK_HEADER_PREFIX_NAME_V2,
+        BLOCK_BODY_PREFIX_NAME, // unused column
+        BLOCK_INFO_PREFIX_NAME,
+        BLOCK_TRANSACTIONS_PREFIX_NAME,
+        BLOCK_TRANSACTION_INFOS_PREFIX_NAME,
+        STATE_NODE_PREFIX_NAME,
+        CHAIN_INFO_PREFIX_NAME,
+        TRANSACTION_PREFIX_NAME,
+        TRANSACTION_INFO_PREFIX_NAME, // unused column
+        TRANSACTION_INFO_PREFIX_NAME_V2,
+        TRANSACTION_INFO_HASH_PREFIX_NAME,
+        CONTRACT_EVENT_PREFIX_NAME,
+        FAILED_BLOCK_PREFIX_NAME,
+        FAILED_BLOCK_PREFIX_NAME_V2,
+        TABLE_INFO_PREFIX_NAME,
+        DAG_SYNC_BLOCK_PREFIX_NAME,
+    ]
+});
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, IntoPrimitive, TryFromPrimitive)]
 #[repr(u8)]
 pub enum StorageVersion {
@@ -180,11 +209,12 @@ pub enum StorageVersion {
     V2 = 2,
     V3 = 3,
     V4 = 4,
+    V5 = 5,
 }
 
 impl StorageVersion {
     pub fn current_version() -> StorageVersion {
-        StorageVersion::V4
+        StorageVersion::V5
     }
 
     pub fn get_column_family_names(&self) -> &'static [ColumnFamilyName] {
@@ -193,6 +223,7 @@ impl StorageVersion {
             StorageVersion::V2 => &VEC_PREFIX_NAME_V2,
             StorageVersion::V3 => &VEC_PREFIX_NAME_V3,
             StorageVersion::V4 => &VEC_PREFIX_NAME_V4,
+            StorageVersion::V5 => &VEC_PREFIX_NAME_V5,
         }
     }
 }
@@ -257,15 +288,9 @@ pub trait BlockStore {
     fn get_snapshot_range(&self) -> Result<Option<SnapshotRange>>;
     fn save_snapshot_range(&self, snapshot_height: SnapshotRange) -> Result<()>;
 
-    fn save_dag_sync_block(
-        &self,
-        block: DagSyncBlock,
-    ) -> Result<()>;
+    fn save_dag_sync_block(&self, block: DagSyncBlock) -> Result<()>;
     fn delete_dag_sync_block(&self, block_id: HashValue) -> Result<()>;
-    fn get_dag_sync_block(
-        &self,
-        block_id: HashValue,
-    ) -> Result<Option<DagSyncBlock>>;
+    fn get_dag_sync_block(&self, block_id: HashValue) -> Result<Option<DagSyncBlock>>;
 }
 
 pub trait BlockTransactionInfoStore {
@@ -512,22 +537,16 @@ impl BlockStore for Storage {
     fn save_snapshot_range(&self, snapshot_range: SnapshotRange) -> Result<()> {
         self.chain_info_storage.save_snapshot_range(snapshot_range)
     }
-    
-    fn save_dag_sync_block(
-        &self,
-        block: DagSyncBlock,
-    ) -> Result<()> {
+
+    fn save_dag_sync_block(&self, block: DagSyncBlock) -> Result<()> {
         self.block_storage.save_dag_sync_block(block)
     }
-    
+
     fn delete_dag_sync_block(&self, block_id: HashValue) -> Result<()> {
         self.block_storage.delete_dag_sync_block(block_id)
     }
-    
-    fn get_dag_sync_block(
-        &self,
-        block_id: HashValue,
-    ) -> Result<Option<DagSyncBlock>> {
+
+    fn get_dag_sync_block(&self, block_id: HashValue) -> Result<Option<DagSyncBlock>> {
         self.block_storage.get_dag_sync_block(block_id)
     }
 }

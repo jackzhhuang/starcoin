@@ -1,10 +1,15 @@
 // Copyright (c) The Starcoin Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
-    define_storage, storage::{
+    define_storage,
+    storage::{
         CodecKVStore, CodecWriteBatch, ColumnFamily, KeyCodec, SchemaStorage, StorageInstance,
         ValueCodec,
-    }, BLOCK_BODY_PREFIX_NAME, BLOCK_HEADER_PREFIX_NAME, BLOCK_HEADER_PREFIX_NAME_V2, BLOCK_PREFIX_NAME, BLOCK_PREFIX_NAME_V2, BLOCK_TRANSACTIONS_PREFIX_NAME, BLOCK_TRANSACTION_INFOS_PREFIX_NAME, DAG_SYNC_BLOCK_PREFIX_NAME, FAILED_BLOCK_PREFIX_NAME, FAILED_BLOCK_PREFIX_NAME_V2
+    },
+    BLOCK_BODY_PREFIX_NAME, BLOCK_HEADER_PREFIX_NAME, BLOCK_HEADER_PREFIX_NAME_V2,
+    BLOCK_PREFIX_NAME, BLOCK_PREFIX_NAME_V2, BLOCK_TRANSACTIONS_PREFIX_NAME,
+    BLOCK_TRANSACTION_INFOS_PREFIX_NAME, DAG_SYNC_BLOCK_PREFIX_NAME, FAILED_BLOCK_PREFIX_NAME,
+    FAILED_BLOCK_PREFIX_NAME_V2,
 };
 use anyhow::{bail, Result};
 use bcs_ext::{BCSCodec, Sample};
@@ -397,22 +402,15 @@ impl BlockStorage {
         self.block_txn_infos_store.put(block_id, txn_info_ids)
     }
 
-    pub fn save_dag_sync_block(
-        &self,
-        block: DagSyncBlock,
-    ) -> Result<()> {
-        self.dag_sync_block_storage
-            .put(block.block.id(), block)
+    pub fn save_dag_sync_block(&self, block: DagSyncBlock) -> Result<()> {
+        self.dag_sync_block_storage.put(block.block.id(), block)
     }
 
     pub fn delete_dag_sync_block(&self, block_id: HashValue) -> Result<()> {
         self.dag_sync_block_storage.remove(block_id)
     }
 
-    pub fn get_dag_sync_block(
-        &self,
-        block_id: HashValue,
-    ) -> Result<Option<DagSyncBlock>> {
+    pub fn get_dag_sync_block(&self, block_id: HashValue) -> Result<Option<DagSyncBlock>> {
         self.dag_sync_block_storage.get(block_id)
     }
 

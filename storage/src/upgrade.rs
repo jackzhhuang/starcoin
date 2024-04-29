@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::block::BlockStorage;
+use crate::block::DagSyncBlockStorage;
 use crate::block_info::BlockInfoStorage;
 use crate::chain_info::ChainInfoStorage;
 use crate::transaction::TransactionStorage;
@@ -11,6 +12,7 @@ use crate::{
     CodecKVStore, RichTransactionInfo, StorageInstance, StorageVersion, TransactionStore,
     BLOCK_BODY_PREFIX_NAME, TRANSACTION_INFO_PREFIX_NAME,
 };
+use anyhow::Ok;
 use anyhow::{bail, ensure, format_err, Result};
 use once_cell::sync::Lazy;
 use starcoin_crypto::HashValue;
@@ -169,6 +171,11 @@ impl DBUpgrade {
         Ok(())
     }
 
+    fn db_upgrade_v4_v5(instance: &mut StorageInstance) -> Result<()> {
+        let _ = DagSyncBlockStorage::new(instance.clone());
+        Ok(())
+    }
+
     pub fn do_upgrade(
         version_in_db: StorageVersion,
         version_in_code: StorageVersion,
@@ -202,6 +209,9 @@ impl DBUpgrade {
             }
             (StorageVersion::V3, StorageVersion::V4) => {
                 Self::db_upgrade_v3_v4(instance)?;
+            }
+            (StorageVersion::V4, StorageVersion::V5) => {
+                Self::db_upgrade_v4_v5(instance)?;
             }
             _ => bail!(
                 "Can not upgrade db from {:?} to {:?}",

@@ -195,7 +195,10 @@ impl BlockDAG {
                 bail!("failed to add a block when committing for invalid interval",);
             }
             Err(e) => {
-                bail!("failed to add a block when committing, e: {:?}", e);
+                bail!(
+                    "in universal error process, failed to add a block when committing, e: {:?}",
+                    e
+                );
             }
         }
 

@@ -11,8 +11,9 @@ mod tests {
             schemadb::{DbReachabilityStore, ReachabilityStore, ReachabilityStoreReader},
         },
         reachability::{inquirer, ReachabilityError},
-        types::{ghostdata, interval::Interval},
+        types::interval::Interval,
     };
+    use starcoin_logger::prelude::debug;
     use starcoin_types::{
         block::{set_test_flexidag_fork_height, BlockHeader, BlockHeaderBuilder, BlockNumber},
         blockhash::KType,
@@ -130,7 +131,7 @@ mod tests {
             .with_parents_hash(Some(vec![genesis.id()]))
             .build();
         let mut dag = BlockDAG::create_for_testing().unwrap();
-        dag.init_with_genesis(genesis.clone()).unwrap();
+        let real_origin = dag.init_with_genesis(genesis.clone()).unwrap();
         dag.commit(block1.clone(), genesis.parent_hash()).unwrap();
         dag.commit(block2.clone(), genesis.parent_hash()).unwrap();
         let block3 = BlockHeaderBuilder::random()
@@ -138,12 +139,19 @@ mod tests {
             .with_parents_hash(Some(vec![block1.id(), block2.id()]))
             .build();
         let mut handles = vec![];
-        for _i in 1..100 {
+        for i in 1..100 {
             let mut dag_clone = dag.clone();
             let block_clone = block3.clone();
-            let origin = genesis.parent_hash();
             let handle = tokio::task::spawn_blocking(move || {
-                let _ = dag_clone.commit(block_clone, origin);
+                match dag_clone.commit(block_clone.clone(), real_origin) {
+                    std::result::Result::Ok(_) => (),
+                    Err(e) => {
+                        debug!("failed to commit error: {:?}, i: {:?}", e, i);
+                        if !dag_clone.has_dag_block(block_clone.id()).unwrap() {
+                            dag_clone.commit(block_clone, real_origin).unwrap();
+                        }
+                    }
+                }
             });
             handles.push(handle);
         }
@@ -536,7 +544,7 @@ mod tests {
         print_reachability_data(&reachability_store, &hashes);
 
         let mut parent = child2;
-        for _i in (1..=1000) {
+        for _i in 1..=1000 {
             let child = Hash::random();
             inquirer::add_block(
                 &mut reachability_store,

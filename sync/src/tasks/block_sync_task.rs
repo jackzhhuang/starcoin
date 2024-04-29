@@ -411,7 +411,10 @@ where
                 &mut absent_blocks,
             )?;
             if absent_blocks.is_empty() {
-                return Ok(absent_blocks_map.into_iter().map(|(_, header)| header).collect());
+                return Ok(absent_blocks_map
+                    .into_iter()
+                    .map(|(_, header)| header)
+                    .collect());
             }
             let remote_absent_blocks = self.fetch_block(absent_blocks).await?;
             block_headers = remote_absent_blocks
@@ -503,9 +506,9 @@ where
                             executed_block.block.id(),
                             executed_block.block.header().number()
                         );
-                        process_dag_ancestors
-                            .insert(block.header().id(), block.header().clone());
-                        self.local_store.delete_dag_sync_block(executed_block.block.id())?;
+                        process_dag_ancestors.insert(block.header().id(), block.header().clone());
+                        self.local_store
+                            .delete_dag_sync_block(executed_block.block.id())?;
                         self.notify_connected_block(
                             executed_block.block,
                             executed_block.block_info.clone(),
@@ -629,10 +632,7 @@ where
         async_std::task::block_on(fut)
     }
 
-    async fn fetch_block(
-        &self,
-        mut block_ids: Vec<HashValue>,
-    ) -> Result<Vec<(HashValue, Block)>> {
+    async fn fetch_block(&self, mut block_ids: Vec<HashValue>) -> Result<Vec<(HashValue, Block)>> {
         let mut result: Vec<(HashValue, Block)> = vec![];
         block_ids.retain(|id| {
             match self.local_store.get_dag_sync_block(*id) {
@@ -644,11 +644,11 @@ where
                         true // need retaining
                     }
                 }
-                Err(_) => true // need retaining
+                Err(_) => true, // need retaining
             }
         });
         for chunk in block_ids.chunks(usize::try_from(MAX_BLOCK_REQUEST_SIZE)?) {
-            let remote_dag_sync_blocks = self.fetcher.fetch_blocks(chunk.to_vec()).await?; 
+            let remote_dag_sync_blocks = self.fetcher.fetch_blocks(chunk.to_vec()).await?;
             for (block, _) in remote_dag_sync_blocks {
                 self.local_store.save_dag_sync_block(DagSyncBlock {
                     block: block.clone(),
