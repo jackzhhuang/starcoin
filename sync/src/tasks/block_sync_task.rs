@@ -503,6 +503,8 @@ where
 
                             self.execute_if_parent_ready(executed_block.block.id())?;
 
+                            self.local_store.delete_dag_sync_block(executed_block.block.id())?;
+
                             self.notify_connected_block(
                                 executed_block.block,
                                 executed_block.block_info.clone(),
@@ -613,6 +615,7 @@ where
                     self.check_enough_by_info(executed_block.block_info)?,
                 )?;
                 self.execute_if_parent_ready(*child)?;
+                self.local_store.delete_dag_sync_block(*child)?;
             }
         }
         parent_block
