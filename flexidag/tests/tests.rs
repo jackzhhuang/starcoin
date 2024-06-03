@@ -2,15 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, format_err, Ok, Result};
+use rocksdb::WriteBatch;
 use starcoin_crypto::HashValue as Hash;
 use starcoin_dag::{
     blockdag::BlockDAG,
     consensusdb::{
-        consenses_state::{DagState, DagStateReader, DagStateStore},
-        schemadb::{
+        consenses_state::{DagState, DagStateReader, DagStateStore}, prelude::StoreError, schemadb::{
             DbReachabilityStore, ReachabilityStore, ReachabilityStoreReader, RelationsStore,
             RelationsStoreReader,
-        },
+        }
     },
     reachability::{inquirer, ReachabilityError},
     types::interval::Interval,
@@ -788,6 +788,53 @@ fn test_dag_mergeset() -> anyhow::Result<()> {
         "add a header: {:?}, blue set: {:?}, red set: {:?}, blue anticone size: {:?}",
         header, ghostdata.mergeset_blues, ghostdata.mergeset_reds, ghostdata.blues_anticone_sizes
     );
+
+    Ok(())
+}
+
+#[test]
+fn test_relationship_inconsistence() -> anyhow::Result<()> {
+    // initialzie the dag firstly
+    let mut dag = BlockDAG::create_for_testing()?;
+
+    let origin = BlockHeaderBuilder::random().with_number(0).build();
+    let genesis = BlockHeader::dag_genesis_random_with_parent(origin)?;
+
+    let origin = dag.init_with_genesis(genesis.clone())?;
+
+    let relationship_store = dag.storage.relations_store.clone();
+
+    let mut writer = relationship_store.write();
+
+    // origin - 0
+    // 0 - 1
+    // 0 - 2 
+    // and break the operation when establishing the relationship of 1 and 2, 3
+    writer.insert(0.into(), Arc::new(vec![origin]))?;
+    writer.insert(1.into(), Arc::new(vec![0.into()]))?;
+    writer.insert(2.into(), Arc::new(vec![0.into()]))?;
+
+
+    // 1,2 - 3 with error
+    let mut batch = WriteBatch::default();
+    let result = writer.insert_parent_with_error(&mut batch, 3.into(), Arc::new(vec![1.into(), 2.into()]), Err(StoreError::DBIoError("test io error".to_string())));
+    assert!(result.is_err());
+
+    assert_eq!((*writer.get_children(1.into())?).clone().contains(&3.into()), false);
+    assert_eq!((*writer.get_children(2.into())?).clone().contains(&3.into()), false);
+
+    // 1,2 - 3 successfully 
+    let mut batch = WriteBatch::default();
+    let result = writer.insert_batch(&mut batch, 3.into(), Arc::new(vec![1.into(), 2.into()]));
+    assert!(result.is_ok());
+
+    assert_eq!((*writer.get_children(1.into())?).clone().contains(&3.into()), false);
+    assert_eq!((*writer.get_children(2.into())?).clone().contains(&3.into()), false);
+
+    writer.write_batch(batch)?;
+
+    assert_eq!((*writer.get_children(1.into())?).clone().contains(&3.into()), true);
+    assert_eq!((*writer.get_children(2.into())?).clone().contains(&3.into()), true);
 
     Ok(())
 }

@@ -4,8 +4,9 @@ use super::{
     prelude::{BatchDbWriter, CachedDbAccess, DirectDbWriter, StoreError},
 };
 use crate::define_schema;
-use rocksdb::WriteBatch;
+use rocksdb::{WriteBatch, WriteBatchWithTransaction};
 use starcoin_crypto::HashValue as Hash;
+use starcoin_storage::storage::RawDBStorage;
 use starcoin_types::blockhash::{BlockHashes, BlockLevel};
 use std::sync::Arc;
 
@@ -91,12 +92,48 @@ impl DbRelationsStore {
         Self::new(Arc::clone(&self.db), self.level, cache_size)
     }
 
+
+
     pub fn insert_batch(
         &mut self,
         batch: &mut WriteBatch,
         hash: Hash,
         parents: BlockHashes,
     ) -> Result<(), StoreError> {
+        // if self.has(hash)? {
+        //     return Err(StoreError::KeyAlreadyExists(hash.to_string()));
+        // }
+
+        // Insert a new entry for `hash`
+        self.parents_access
+            .write(BatchDbWriter::new(batch), hash, parents.clone())?;
+
+        // The new hash has no children yet
+        self.children_access.write(
+            BatchDbWriter::new(batch),
+            hash,
+            BlockHashes::new(Vec::new()),
+        )?;
+
+        // Update `children` for each parent
+        for parent in parents.iter().cloned() {
+            let mut children = (*self.get_children(parent)?).clone();
+            children.push(hash);
+            self.children_access.write(
+                BatchDbWriter::new(batch),
+                parent,
+                BlockHashes::new(children),
+            )?;
+        }
+
+        Ok(())
+    }
+
+    pub fn write_batch(&self, batch: WriteBatch) -> Result<(), StoreError> {
+        self.db.raw_write_batch(batch).map_err(|e| StoreError::DBIoError(e.to_string()))
+    }
+
+    pub fn insert_parent_with_error(&mut self, batch: &mut WriteBatch, hash: Hash, parents: BlockHashes, result: Result<(), StoreError>) -> Result<(), StoreError> {
         if self.has(hash)? {
             return Err(StoreError::KeyAlreadyExists(hash.to_string()));
         }
@@ -111,6 +148,10 @@ impl DbRelationsStore {
             hash,
             BlockHashes::new(Vec::new()),
         )?;
+
+        if result.is_err() {
+            return result;
+        }
 
         // Update `children` for each parent
         for parent in parents.iter().cloned() {
@@ -178,6 +219,8 @@ impl RelationsStore for DbRelationsStore {
 
         Ok(())
     }
+
+
 }
 
 #[cfg(test)]
