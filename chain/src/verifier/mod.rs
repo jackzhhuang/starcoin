@@ -374,6 +374,17 @@ impl BlockVerifier for DagVerifier {
             new_block_header.parent_hash()
         );
 
+        for header_id in parents_hash_to_check {
+            verify_block!(
+                VerifyBlockField::Header,
+                current_chain.has_dag_block(header_id)?,
+                "Invalid dag block: the parent: {:?} in parents_hash dose not exist in dag block: {:?}, number: {:?}",
+                header_id,
+                new_block_header.id(),
+                new_block_header.number(),
+            );
+        }
+
         ConsensusVerifier::verify_header(current_chain, new_block_header)
     }
 
